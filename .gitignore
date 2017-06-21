@@ -1,4 +1,4 @@
-pyspark-notebooks/data
-pyspark-notebooks/spark-warehouse
-pyspark-notebooks/.ipynb_checkpoints/
-pyspark-notebooks/.ipython/
+src/data
+src/spark-warehouse
+src/.ipynb_checkpoints/
+src/.ipython/
