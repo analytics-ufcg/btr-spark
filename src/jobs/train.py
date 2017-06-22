@@ -33,6 +33,8 @@ def save_train_info(model, predictions_and_labels, output, filepath = "output.tx
 def read_data(sqlContext, filepath = "../data/curitiba/prediction_data.csv"):
 	df = sqlContext.read.format("com.databricks.spark.csv").option("header", "true").option("inferSchema","true").load(filepath)
 
+	df = df.withColumn("totalpassengers", df['totalpassengers'].cast('Double'))
+
 	#df = df.withColumn('date_timestamp', df['date'].cast('Integer'))
 
 	return df
@@ -59,7 +61,7 @@ def train_duration_model(training_df):
 	return duration_lr_model
 
 def train_crowdedness_model(training_df):
-	crowdedness_lr = LinearRegression(maxIter=10, regParam=0.3, elasticNetParam=1).setLabelCol("totalpassengers").setFeaturesCol("features")
+	crowdedness_lr = LinearRegression(maxIter=10, regParam=0.3, elasticNetParam=1.0).setLabelCol("totalpassengers").setFeaturesCol("features")
 
 	crowdedness_lr_model = crowdedness_lr.fit(training_df)
 
@@ -83,7 +85,7 @@ if __name__ == "__main__":
 	#save_model(duration_model, "../data/models/duration_lasso_model")
 
 	# Crowdedness
-	crowdedness_model = train_crowdedness_model(train)
+	crowdedness_model = train_crowdedness_model(preproc_data)
 
 	predictions_and_labels = getPredictionsLabels(duration_model, preproc_data)
 	save_train_info(crowdedness_model, predictions_and_labels, "Crowdedness model\n")
