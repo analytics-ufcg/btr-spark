@@ -34,5 +34,13 @@
     		<artifactId>spark-sql_2.10</artifactId>
     		<version>1.6.0</version>
     	</dependency>
+    	
+    	<!-- https://mvnrepository.com/artifact/com.databricks/spark-csv_2.10 -->
+		<dependency>
+		    <groupId>com.databricks</groupId>
+		    <artifactId>spark-csv_2.10</artifactId>
+		    <version>1.5.0</version>
+		</dependency>
+    	
     </dependencies>
 </project>
