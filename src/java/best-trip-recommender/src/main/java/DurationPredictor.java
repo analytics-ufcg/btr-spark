@@ -7,9 +7,9 @@ import java.net.URISyntaxException;
 import org.apache.spark.SparkConf;
 import org.apache.spark.ml.Pipeline;
 import org.apache.spark.ml.PipelineStage;
+import org.apache.spark.ml.evaluation.RegressionEvaluator;
 import org.apache.spark.ml.feature.StringIndexer;
 import org.apache.spark.ml.feature.VectorAssembler;
-import org.apache.spark.ml.feature.VectorIndexer;
 import org.apache.spark.ml.regression.LinearRegression;
 import org.apache.spark.ml.regression.LinearRegressionModel;
 import org.apache.spark.ml.regression.LinearRegressionTrainingSummary;
@@ -78,6 +78,8 @@ public class DurationPredictor {
 		
 		// Fit the model
 		LinearRegressionModel lrModel = lr.fit(trainingDF);
+		
+		lrModel.write().overwrite().save(args[1]);
 
 		// Print the coefficients and intercept for linear regression
 		System.out.println("Coefficients: " + lrModel.coefficients() + " Intercept: " + lrModel.intercept());
@@ -90,6 +92,32 @@ public class DurationPredictor {
 		System.out.println("RMSE: " + trainingSummary.rootMeanSquaredError());
 		System.out.println("r2: " + trainingSummary.r2());
 
+		System.out.println("==================== Loaded Model ====================");
+		
+		LinearRegressionModel lrModelLoaded = LinearRegressionModel.load(args[1]);
+		
+		DataFrame predictions = lrModelLoaded.transform(trainingDF);
+		
+		predictions.show(5);
+		
+		// Select (prediction, true label) and compute test error.
+		RegressionEvaluator evaluator = new RegressionEvaluator()
+		  .setLabelCol("duration")
+		  .setPredictionCol("prediction")
+		  .setMetricName("rmse");
+		double rmse = evaluator.evaluate(predictions);
+		System.out.println("Root Mean Squared Error (RMSE) on test data = " + rmse);
+		
+		/*System.out.println("Coefficients: " + lrModelLoaded.coefficients() + " Intercept: " + lrModelLoaded.intercept());
+
+		// Summarize the model over the training set and print out some metrics
+		LinearRegressionTrainingSummary trainingSummary2 = lrModelLoaded.summary();
+		System.out.println("numIterations: " + trainingSummary2.totalIterations());
+		System.out.println("objectiveHistory: " + Vectors.dense(trainingSummary2.objectiveHistory()));
+		trainingSummary2.residuals().show();
+		System.out.println("RMSE: " + trainingSummary2.rootMeanSquaredError());
+		System.out.println("r2: " + trainingSummary2.r2());
+*/		
 		jsc.stop();
 
 	}
