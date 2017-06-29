@@ -7,6 +7,7 @@ import java.net.URISyntaxException;
 import org.apache.spark.SparkConf;
 import org.apache.spark.ml.Pipeline;
 import org.apache.spark.ml.PipelineStage;
+import org.apache.spark.ml.feature.StringIndexer;
 import org.apache.spark.ml.feature.VectorAssembler;
 import org.apache.spark.ml.feature.VectorIndexer;
 import org.apache.spark.ml.regression.LinearRegression;
@@ -41,11 +42,9 @@ public class DurationPredictor {
 		PipelineStage[] featuresIndexers = new PipelineStage[categoricalFeatures.length];
 		
 		for (int i = 0; i < categoricalFeatures.length; i++) {
-			featuresIndexers[i] = new VectorIndexer()
+			featuresIndexers[i] = new StringIndexer() //VectorIndexer()
 					.setInputCol(categoricalFeatures[i])
-					.setOutputCol(categoricalFeatures[i] + "_index")
-					// Number of routes
-					.setMaxCategories(240);
+					.setOutputCol(categoricalFeatures[i] + "_index");
 		}
 		
 		Pipeline pipeline = new Pipeline()
@@ -60,11 +59,11 @@ public class DurationPredictor {
 		trainingDF.printSchema();
 
 		VectorAssembler assembler = new VectorAssembler()
-				.setInputCols(new String[] {"departure", "arrival", "route", "week_day",
-						"difference_previous_schedule", "difference_next_schedule"})
+				.setInputCols(new String[] {"departure", "arrival", "route_index", "week_day_index"/*,
+						"difference_previous_schedule", "difference_next_schedule"*/})
 				.setOutputCol("features");
 
-		trainingDF = assembler.transform(training);
+		trainingDF = assembler.transform(trainingDF);
 
 		trainingDF.show(1);
 
