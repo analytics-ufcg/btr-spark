@@ -15,7 +15,7 @@ def getPredictionsLabels(model, test_data):
 
 	return predictions.map(lambda row: (row.prediction, row.duration))
 
-def save_train_info(model, predictions_and_labels, output, filepath = "output.txt"):
+def save_train_info(model, predictions_and_labels, output, filepath = "hdfs://localhost:9000/btr/ctba/output.txt"):
 	with open(filepath, 'a') as outfile:
 		output += "Model:\n"
 		output += "Coefficients: %s\n" % str(model.coefficients)
@@ -73,7 +73,7 @@ def save_model(model, filepath):
 if __name__ == "__main__":
 	sc = SparkContext("local[*]", appName="train_btr")
 	sqlContext = pyspark.SQLContext(sc)
-	data = read_data(sqlContext)
+	data = read_data(sqlContext, "hdfs://localhost:9000/btr/ctba/data/prediction_data.csv")
 	preproc_data = data_pre_proc(data)
 
 	# Duration
