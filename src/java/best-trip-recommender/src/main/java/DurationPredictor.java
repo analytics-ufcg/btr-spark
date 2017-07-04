@@ -17,6 +17,8 @@ import org.apache.spark.mllib.linalg.Vectors;
 import org.apache.spark.sql.DataFrame;
 import org.apache.spark.sql.SQLContext;
 
+//import com.google.common.collect.ImmutableMap;
+
 public class DurationPredictor {
 
 	public static void main(String[] args) throws URISyntaxException, IOException {
@@ -31,7 +33,14 @@ public class DurationPredictor {
 				.option("inferSchema", "true")
 				.load(args[0]);
 
-		training.show(1);
+		training.show(2);
+		
+//		training = training.na().replace(new String[] {"difference_previous_schedule", "difference_next_schedule"}, ImmutableMap.of("NA", "-1"));
+		training = training.filter("difference_previous_schedule != 'NA' AND difference_next_schedule != 'NA'");
+		training = training.withColumn("difference_previous_schedule", training.col("difference_previous_schedule").cast("double"));
+		training = training.withColumn("difference_next_schedule", training.col("difference_next_schedule").cast("double"));
+		
+		training.show(2);
 
 		training.printSchema();
 		
@@ -59,8 +68,8 @@ public class DurationPredictor {
 		trainingDF.printSchema();
 
 		VectorAssembler assembler = new VectorAssembler()
-				.setInputCols(new String[] {"departure", "arrival", "route_index", "week_day_index"/*,
-						"difference_previous_schedule", "difference_next_schedule"*/})
+				.setInputCols(new String[] {"departure", "arrival", "route_index", "week_day_index",
+						"difference_previous_schedule", "difference_next_schedule"})
 				.setOutputCol("features");
 
 		trainingDF = assembler.transform(trainingDF);
@@ -108,16 +117,8 @@ public class DurationPredictor {
 		double rmse = evaluator.evaluate(predictions);
 		System.out.println("Root Mean Squared Error (RMSE) on test data = " + rmse);
 		
-		/*System.out.println("Coefficients: " + lrModelLoaded.coefficients() + " Intercept: " + lrModelLoaded.intercept());
-
-		// Summarize the model over the training set and print out some metrics
-		LinearRegressionTrainingSummary trainingSummary2 = lrModelLoaded.summary();
-		System.out.println("numIterations: " + trainingSummary2.totalIterations());
-		System.out.println("objectiveHistory: " + Vectors.dense(trainingSummary2.objectiveHistory()));
-		trainingSummary2.residuals().show();
-		System.out.println("RMSE: " + trainingSummary2.rootMeanSquaredError());
-		System.out.println("r2: " + trainingSummary2.r2());
-*/		
+		System.out.println("Coefficients: " + lrModelLoaded.coefficients() + " Intercept: " + lrModelLoaded.intercept());
+		
 		jsc.stop();
 
 	}
