@@ -1,9 +1,18 @@
 
 import org.apache.spark.api.java.JavaSparkContext;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.URI;
 import java.net.URISyntaxException;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.spark.SparkConf;
 import org.apache.spark.ml.Pipeline;
 import org.apache.spark.ml.PipelineStage;
@@ -16,6 +25,7 @@ import org.apache.spark.ml.regression.LinearRegressionTrainingSummary;
 import org.apache.spark.mllib.linalg.Vectors;
 import org.apache.spark.sql.DataFrame;
 import org.apache.spark.sql.SQLContext;
+
 
 //import com.google.common.collect.ImmutableMap;
 
@@ -86,9 +96,9 @@ public class DurationPredictor {
 				.setFeaturesCol("features");
 		
 		// Fit the model
-		LinearRegressionModel lrModel = lr.fit(trainingDF);
-		
-		lrModel.write().overwrite().save(args[1]);
+		LinearRegressionModel lrModel = lr.fit(trainingDF);		
+
+		lrModel.write().saveImpl(args[1]);
 
 		// Print the coefficients and intercept for linear regression
 		System.out.println("Coefficients: " + lrModel.coefficients() + " Intercept: " + lrModel.intercept());
@@ -102,6 +112,7 @@ public class DurationPredictor {
 		System.out.println("r2: " + trainingSummary.r2());
 
 		System.out.println("==================== Loaded Model ====================");
+		
 		
 		LinearRegressionModel lrModelLoaded = LinearRegressionModel.load(args[1]);
 		
