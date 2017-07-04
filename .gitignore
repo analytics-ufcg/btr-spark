@@ -3,3 +3,4 @@ src/spark-warehouse
 src/.ipynb_checkpoints/
 src/.ipython/
 src/java/best-trip-recommender/target/*
+src/java/best-trip-recommender/.project
