@@ -9,11 +9,12 @@ from pyspark.ml.regression import LinearRegressionModel, LinearRegression
 
 import sys
 from pyspark import SparkContext
+import os
 
 def getPredictionsLabels(model, test_data):
 	predictions = model.transform(test_data)
 
-	return predictions.map(lambda row: (row.prediction, row.duration))
+	return predictions.rdd.map(lambda row: (row.prediction, row.duration))
 
 def save_train_info(model, predictions_and_labels, output, filepath = "hdfs://localhost:9000/btr/ctba/output.txt"):
 	with open(filepath, 'a') as outfile:
@@ -71,25 +72,44 @@ def save_model(model, filepath):
 	model.write().overwrite().save(filepath)
 
 if __name__ == "__main__":
+	if len(sys.argv) < 5:
+        	print "Error: Wrong parameter specification!"
+		print "Your command should be something like:"
+		print "spark-submit com.databricks:spark-csv_2.10:1.5.0 <%s-directory> <training-data-filepath> <train-info-output-filepath> <duration-model-path-to-save> <crowdedness-model-path-to-save>" % (sys.argv[0])
+		sys.exit(1)
+	elif not os.path.exists(sys.argv[1]):
+		print "Error: training-data-filepath doesn't exist! You must specify a valid one!"
+                sys.exit(1)		
+
+	training_data_filepath, train_info_output_filepath, duration_model_path_to_save, crowdedness_model_path_to_save = sys.argv[1:5]
+
 	sc = SparkContext("local[*]", appName="train_btr")
 	sqlContext = pyspark.SQLContext(sc)
-	data = read_data(sqlContext, "hdfs://localhost:9000/btr/ctba/data/prediction_data.csv")
+	data = read_data(sqlContext, training_data_filepath)
 	preproc_data = data_pre_proc(data)
 
 	# Duration
 	duration_model = train_duration_model(preproc_data)
 
 	predictions_and_labels = getPredictionsLabels(duration_model, preproc_data)
-	save_train_info(duration_model, predictions_and_labels, "Duration model\n")
+	save_train_info(duration_model, predictions_and_labels, "Duration model\n", train_info_output_filepath)
 
-	#save_model(duration_model, "../data/models/duration_lasso_model")
+	save_model(duration_model, duration_model_path_to_save)
+
+	duration_model_loaded = LinearRegressionModel.load(duration_model_path_to_save)
+
+	print duration_model_loaded.coefficients[0]
 
 	# Crowdedness
 	crowdedness_model = train_crowdedness_model(preproc_data)
 
 	predictions_and_labels = getPredictionsLabels(duration_model, preproc_data)
-	save_train_info(crowdedness_model, predictions_and_labels, "Crowdedness model\n")
+	save_train_info(crowdedness_model, predictions_and_labels, "Crowdedness model\n", train_info_output_filepath)
 
-	#save_model(crowdedness_model, "../data/models/crowdedness_lasso_model")
+	save_model(crowdedness_model, crowdedness_model_path_to_save)
+
+	crowdedness_model_loaded = LinearRegressionModel.load(crowdedness_model_path_to_save)
+
+	print crowdedness_model_loaded.coefficients[0]
 
 	sc.stop()
