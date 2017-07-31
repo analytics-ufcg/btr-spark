@@ -1,6 +1,7 @@
 library(dplyr)
 library(readr)
 library(geosphere)
+library(ggplot2)
 
 directory <- "/local/orion/bigsea/bigsea_data/curitiba_gtfs/"
 
@@ -42,11 +43,43 @@ write.csv(stops.matched.shape.sequence, "/local/orion/bigsea/stops-matched-shape
 # Validation
 
 stops.matched.shape.sequence.2 <- stops.matched.shape.sequence %>% 
-  arrange(shape_id, stop_sequence) %>% 
+  arrange(shape_id, shape_pt_sequence) %>% 
   mutate(
-    stop.dif.prev = ifelse(shape_dist_traveled == 0, 1, stop_sequence - lag(stop_sequence)),
-    shape.dif.prev = ifelse(shape_dist_traveled == 0, 1, ifelse(shape_dist_traveled < lag(shape_dist_traveled), shape_dist_traveled - lag(shape_dist_traveled), 1))
+    stop.dif.prev = ifelse(shape_id != lag(shape_id), 1, stop_sequence - lag(stop_sequence)),
+    shape.dif.prev = ifelse(shape_id != lag(shape_id), 1, ifelse(shape_pt_sequence < lag(shape_pt_sequence), -1, 1))
   )
 
-stops.matched.shape.sequence.2 %>% distinct(stop.dif.prev) %>% nrow()
-stops.matched.shape.sequence.2 %>% distinct(shape.dif.prev) %>% nrow()
+stops.matched.shape.sequence.2 %>% select(stop.dif.prev) %>% table()
+stops.matched.shape.sequence.2 %>% select(shape.dif.prev) %>% table()
+  
+stops.matched.shape.sequence.3 <- stops.matched.shape.sequence.2 %>% 
+  select(stop_id, shape_id, route_short_name, shape_pt_lat, shape_pt_lon, shape_pt_sequence)
+  
+# Joining BULMA output to stops and shape match
+
+bulma.output <- read_csv("/local/orion/bigsea/dados_bulma/output/2017_02_01_veiculos.csv", na = c("", "NA", "-")) %>% 
+  filter(TRIP_PROBLEM == 0)
+
+bulma.output.joined <- bulma.output %>% 
+  left_join(stops.matched.shape.sequence.3, by = c(
+    "SHAPE_SEQ" = "shape_pt_sequence",
+    "SHAPE_ID" = "shape_id"#,
+    #"LAT_SHAPE" = "shape_pt_lat",
+    #"LON_SHAPE" = "shape_pt_lon"
+    )
+  )
+
+bulma.output.joined %>% filter(!is.na(stop_id)) %>% count()
+
+count.matched.stops <- bulma.output.joined %>% 
+  group_by(SHAPE_ID) %>% 
+  summarise(stops.number = sum(!is.na(stop_id)),
+            total = n()) %>% 
+  mutate(stops.by.total = stops.number / total)
+  
+ggplot(count.matched.stops, aes(x = "stops.by.total", y = stops.by.total)) +
+  geom_violin() +
+  geom_boxplot(width = 0.2)
+
+  
+  
