@@ -57,15 +57,36 @@ stops.matched.shape.sequence.3 <- stops.matched.shape.sequence.2 %>%
   
 # Joining BULMA output to stops and shape match
 
+write.bulma.join <- function(bulma.input.filepath, bulma.output.filepath, stops.matched.seq) {
+  bulma.output <- read_csv(bulma.input.filepath, na = c("", "NA", "-")) %>% 
+    filter(TRIP_PROBLEM == 0)
+  
+  bulma.output.joined <- bulma.output %>% 
+    left_join(stops.matched.seq, by = c(
+      "SHAPE_SEQ" = "shape_pt_sequence",
+      "SHAPE_ID" = "shape_id"
+    )
+    )
+  
+  write.csv(bulma.output.joined, bulma.output.filepath)
+}
+
+write.bulma.join("/local/orion/bigsea/dados_bulma/output/2017_02_01_veiculos.csv","/local/orion/bigsea/dados_bulma_join_stops/2017_02_01_veiculos.csv", stops.matched.shape.sequence.3)
+write.bulma.join("/local/orion/bigsea/dados_bulma/output/2017_02_02_veiculos.csv","/local/orion/bigsea/dados_bulma_join_stops/2017_02_02_veiculos.csv", stops.matched.shape.sequence.3)
+write.bulma.join("/local/orion/bigsea/dados_bulma/output/2017_02_03_veiculos.csv","/local/orion/bigsea/dados_bulma_join_stops/2017_02_03_veiculos.csv", stops.matched.shape.sequence.3)
+write.bulma.join("/local/orion/bigsea/dados_bulma/output/2017_02_04_veiculos.csv","/local/orion/bigsea/dados_bulma_join_stops/2017_02_04_veiculos.csv", stops.matched.shape.sequence.3)
+write.bulma.join("/local/orion/bigsea/dados_bulma/output/2017_02_05_veiculos.csv","/local/orion/bigsea/dados_bulma_join_stops/2017_02_05_veiculos.csv", stops.matched.shape.sequence.3)
+write.bulma.join("/local/orion/bigsea/dados_bulma/output/2017_02_06_veiculos.csv","/local/orion/bigsea/dados_bulma_join_stops/2017_02_06_veiculos.csv", stops.matched.shape.sequence.3)
+write.bulma.join("/local/orion/bigsea/dados_bulma/output/2017_02_07_veiculos.csv","/local/orion/bigsea/dados_bulma_join_stops/2017_02_07_veiculos.csv", stops.matched.shape.sequence.3)
+
+
 bulma.output <- read_csv("/local/orion/bigsea/dados_bulma/output/2017_02_01_veiculos.csv", na = c("", "NA", "-")) %>% 
   filter(TRIP_PROBLEM == 0)
 
 bulma.output.joined <- bulma.output %>% 
   left_join(stops.matched.shape.sequence.3, by = c(
     "SHAPE_SEQ" = "shape_pt_sequence",
-    "SHAPE_ID" = "shape_id"#,
-    #"LAT_SHAPE" = "shape_pt_lat",
-    #"LON_SHAPE" = "shape_pt_lon"
+    "SHAPE_ID" = "shape_id"
     )
   )
 
@@ -81,5 +102,9 @@ ggplot(count.matched.stops, aes(x = "stops.by.total", y = stops.by.total)) +
   geom_violin() +
   geom_boxplot(width = 0.2)
 
+(bulma.output.joined %>% filter(SHAPE_ID == 1713))$SHAPE_SEQ %in% (shapes %>% filter(shape_id == 1713))$shape_pt_sequence %>% table()
+(bulma.output.joined %>% filter(SHAPE_ID == 1715))$SHAPE_SEQ %in% (shapes %>% filter(shape_id == 1715))$shape_pt_sequence %>% table()
+(bulma.output.joined %>% filter(SHAPE_ID == 1716))$SHAPE_SEQ %in% (shapes %>% filter(shape_id == 1716))$shape_pt_sequence %>% table()
+(bulma.output.joined %>% filter(SHAPE_ID == 1708))$SHAPE_SEQ %in% (shapes %>% filter(shape_id == 1708))$shape_pt_sequence %>% table()
   
   
