@@ -1,27 +1,41 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import sys
-import os.path
+from os import listdir
+from os.path import isfile, join, splitext
 
 import pyspark
 from pyspark import SparkContext
-from pyspark.sql.functions import udf
-from pyspark.sql.types import StringType, IntegerType
+from pyspark.sql.functions import lit
+
+def read_file(filepath, sqlContext):
+    data_frame = sqlContext.read.format("com.databricks.spark.csv") \
+        .option("header", "true") \
+        .option("inferSchema", "true") \
+        .option("nullValue", "-") \
+        .load(filepath)
+
+    # adicionar data
+    date = "-".join(filepath.split("/")[-1].split("_")[:3])
+
+    data_frame = data_frame.withColumn("DATE", lit(date))
+
+    return data_frame
 
 def read_files(path, sqlContext):
-    extension = os.path.splitext(path)[1]
-
-    data_frame = sqlContext.read.format("com.databricks.spark.csv")\
-            .option("header", "true")\
-            .option("inferSchema","true")\
-            .option("nullValue", "-")
+    extension = splitext(path)[1]
 
     if extension == "":
-        return data_frame\
-            .load(path + "/*.csv")
+        files = [join(path, f) for f in listdir(path) if isfile(join(path, f))]
+
+        return reduce(lambda df1, df2: df1.unionAll(df2),
+                      map(lambda f: read_file(f, sqlContext), files))
     else:
-        return data_frame\
-            .load(path)
+        return read_file(path, sqlContext)
 
 def as_tuple_list(data_frame):
+    # rota, data, veículo
     rdd = data_frame.rdd.map(
         lambda row: (row.asDict().get("SHAPE_ID"), {i: row.asDict()[i] for i in row.asDict() if i != "SHAPE_ID"})
     )
@@ -46,6 +60,6 @@ if __name__ == "__main__":
     print "==================================================="
 
 
-    print as_tuple_list(data_frame).take(5)
+    #print as_tuple_list(data_frame).take(5)
 
 
