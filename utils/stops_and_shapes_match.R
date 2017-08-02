@@ -68,7 +68,11 @@ write.bulma.join <- function(bulma.input.filepath, bulma.output.filepath, stops.
     )
     )
   
-  write.csv(bulma.output.joined, bulma.output.filepath)
+  bulma.output.joined <- bulma.output.joined %>% 
+    select(-route_short_name, -shape_pt_lat, -shape_pt_lon) %>% 
+    rename(STOP_ID = stop_id)
+  
+  write.csv(bulma.output.joined, bulma.output.filepath, row.names = FALSE, na = "-")
 }
 
 write.bulma.join("/local/orion/bigsea/dados_bulma/output/2017_02_01_veiculos.csv","/local/orion/bigsea/dados_bulma_join_stops/2017_02_01_veiculos.csv", stops.matched.shape.sequence.3)
