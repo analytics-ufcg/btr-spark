@@ -16,7 +16,6 @@ def read_file(filepath, sqlContext):
         .option("nullValue", "-") \
         .load(filepath)
 
-    # adicionar data
     date = "-".join(filepath.split("/")[-1].split("_")[:3])
 
     data_frame = data_frame.withColumn("DATE", lit(date))
@@ -35,12 +34,28 @@ def read_files(path, sqlContext):
         return read_file(path, sqlContext)
 
 def as_tuple_list(data_frame):
-    # rota, data, veículo
+    grouping_set = ["DATE", "ROUTE", "BUS_CODE"]
+
     rdd = data_frame.rdd.map(
-        lambda row: (row.asDict().get("SHAPE_ID"), {i: row.asDict()[i] for i in row.asDict() if i != "SHAPE_ID"})
+        lambda row: (tuple(row.asDict()[i] for i in row.asDict() if i in grouping_set),
+                     {i: row.asDict()[i] for i in row.asDict() if i not in grouping_set})
     )
 
     return rdd
+
+
+def combine_stops(key, values):
+    trips = list(values)
+    combined_trips = list()
+
+    for i in range(len(trips)):
+       for j in range(i + i, len(trips)):
+           if trips[i]["STOP_ID"] == trips[j]["STOP_ID"]:
+               break
+           else:
+               combined_trips.append((trips[i], trips[j]))
+
+    return (key, combined_trips)
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -53,13 +68,16 @@ if __name__ == "__main__":
     sc = SparkContext("local[*]", appName="train_btr")
     sqlContext = pyspark.SQLContext(sc)
 
-    data_frame = read_files(btr_input_path, sqlContext)
+    trips_df = read_files(btr_input_path, sqlContext)
+
+    stops_df = trips_df.na.drop(subset = ["STOP_ID"])
+
+    stops_rdd = as_tuple_list(stops_df)
+
+    combined_stops_rdd = stops_rdd.groupByKey().map(lambda (key, value): combine_stops(key, value))
+
+    print combined_stops_rdd.take(20)
 
     print "==================================================="
-    data_frame.show(5)
+    stops_df.show(5)
     print "==================================================="
-
-
-    #print as_tuple_list(data_frame).take(5)
-
-
