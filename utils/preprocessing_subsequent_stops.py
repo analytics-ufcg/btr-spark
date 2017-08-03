@@ -80,12 +80,14 @@ def rename_columns(df, list_of_tuples):
     return df
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 3:
         print "Error! Your command must be something like:"
-        print "spark-submit --packages com.databricks:spark-csv_2.10:1.5.0 %s <btr-input-path>" % (sys.argv[0])
+        print "spark-submit --packages com.databricks:spark-csv_2.10:1.5.0 %s <btr-input-path> " \
+              "<btr-pre-processing-output>" % (sys.argv[0])
         sys.exit(1)
 
     btr_input_path = sys.argv[1]
+    btr_pre_processing_output = sys.argv[2]
 
     sc = SparkContext("local[*]", appName="btr_pre_processing")
     sqlContext = pyspark.SQLContext(sc)
@@ -121,8 +123,12 @@ if __name__ == "__main__":
         ]
     )
 
+    stops_df_lead = stops_df_lead.na.drop(subset=["STOP_ID_DEST"])
+
     print stops_df.show(10)
 
     print stops_df_lead.show(10)
+
+    stops_df_lead.write.format("com.databricks.spark.csv").save(btr_pre_processing_output)
 
     sc.stop()
