@@ -79,6 +79,35 @@ def rename_columns(df, list_of_tuples):
 
     return df
 
+def extract_features():
+    print "Inicial features"
+    print ["TRIP_NUM_ORIG", "ROUTE", "SHAPE_ID", "SHAPE_SEQ", "LAT_SHAPE_ORIG", "LON_SHAPE_ORIG", "GPS_POINT_ID",
+           "BUS_CODE", "TIMESTAMP_ORIG", "LAT_GPS", "LON_GPS", "DISTANCE_ORIG", "THRESHOLD_PROBLEM", "TRIP_PROBLEM",
+           "STOP_ID_ORIG", "DATE", "STOP_ID_DEST", "TIMESTAMP_DEST", "TRIP_NUM_DEST", "LAT_SHAPE_DEST",
+           "LON_SHAPE_DEST", "DISTANCE_DEST"]
+
+    # TODO variable to predict
+    # TIMESTAMP_ORIG + TIMESTAMP_DEST      => Extract duration in seconds
+
+    # TODO feature extraction
+    # TIMESTAMP_ORIG                       => Extract hour
+    # TIMESTAMP_DEST                       => Extract hour
+    # hour                                 => Extract is rush hour
+    # hour                                 => Extract is rush hour
+    # hour                                 => Extract period of day
+    # hour                                 => Extract period of day
+    # DATE                                 => Extract week day
+    # DATE                                 => Extract week number
+    # DATE                                 => Extract day of month
+    # DATE                                 => Extract month
+    # month                                => Extract is holidays
+    # week day                             => Extract is weekend
+    # week day                             => Extract is TUE, WED, THU
+    # DISTANCE_ORIG + DISTANCE_DEST        => Extract total distance
+    # duration in seconds + total distance => Extract speed
+    # LAT_SHAPE_ORIG + LON_SHAPE_ORIG      => Extract region of city
+    # LAT_SHAPE_DEST + LON_SHAPE_DEST      => Extract region of city
+
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print "Error! Your command must be something like:"
