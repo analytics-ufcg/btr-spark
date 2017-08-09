@@ -120,16 +120,20 @@ def extract_features(df):
     # Extract hour
     df = df.withColumn("HOUR_DEST", hour("TIMESTAMP_DEST"))
     # Extract is rush hour
-    rush_hours_orig = when((df.HOUR_ORIG == 6) | (df.HOUR_ORIG == 7) | (df.HOUR_ORIG == 11) | (df.HOUR_ORIG == 12) | (df.HOUR_ORIG == 17) | (df.HOUR_ORIG == 18), 1).otherwise(0)
+    rush_hours_orig = when((df.HOUR_ORIG == 6) | (df.HOUR_ORIG == 7) | (df.HOUR_ORIG == 11) | (df.HOUR_ORIG == 12) |
+                           (df.HOUR_ORIG == 17) | (df.HOUR_ORIG == 18), 1).otherwise(0)
     df = df.withColumn("IS_RUSH_ORIG", rush_hours_orig)
     # Extract is rush hour
-    rush_hours_dest = when((df.HOUR_DEST == 6) | (df.HOUR_DEST == 7) | (df.HOUR_DEST == 11) | (df.HOUR_DEST == 12) | (df.HOUR_DEST == 17) | (df.HOUR_DEST == 18), 1).otherwise(0)
+    rush_hours_dest = when((df.HOUR_DEST == 6) | (df.HOUR_DEST == 7) | (df.HOUR_DEST == 11) | (df.HOUR_DEST == 12) |
+                           (df.HOUR_DEST == 17) | (df.HOUR_DEST == 18), 1).otherwise(0)
     df = df.withColumn("IS_RUSH_DEST", rush_hours_dest)
     # Extract period of day
-    period_orig = when(df.HOUR_ORIG < 12, "morning").otherwise(when((df.HOUR_ORIG >= 12) & (df.HOUR_ORIG < 18), "afternoon").otherwise("night"))
+    period_orig = when(df.HOUR_ORIG < 12, "morning").otherwise(when((df.HOUR_ORIG >= 12) & (df.HOUR_ORIG < 18),
+                                                                    "afternoon").otherwise("night"))
     df = df.withColumn("PERIOD_ORIG", period_orig)
     # Extract period of day
-    period_dest = when(df.HOUR_DEST < 12, "morning").otherwise(when((df.HOUR_DEST >= 12) & (df.HOUR_DEST < 18), "afternoon").otherwise("night"))
+    period_dest = when(df.HOUR_DEST < 12, "morning").otherwise(when((df.HOUR_DEST >= 12) & (df.HOUR_DEST < 18),
+                                                                    "afternoon").otherwise("night"))
     df = df.withColumn("PERIOD_DEST", period_dest)
     # Extract week day
     udf_weekday = udf(weekday, StringType())
@@ -151,7 +155,8 @@ def extract_features(df):
     df = df.withColumn("IS_REGULAR_DAY", is_regular_day)
     # Extract total distance
     haversine_udf = udf(haversine, DoubleType())
-    df = df.withColumn("TOTAL_DISTANCE", haversine_udf("LON_SHAPE_ORIG", "LAT_SHAPE_ORIG", "LON_SHAPE_DEST", "LAT_SHAPE_DEST"))
+    df = df.withColumn("TOTAL_DISTANCE", haversine_udf("LON_SHAPE_ORIG", "LAT_SHAPE_ORIG", "LON_SHAPE_DEST",
+                                                       "LAT_SHAPE_DEST"))
 
     return df
 
@@ -206,6 +211,7 @@ if __name__ == "__main__":
 
     stops_df_lead = extract_features(stops_df_lead)
 
-    #stops_df_lead.write.format("com.databricks.spark.csv").save(btr_pre_processing_output)
+    stops_df_lead.write.format("com.databricks.spark.csv")\
+        .save(btr_pre_processing_output, mode="overwrite", header = True)
 
     sc.stop()

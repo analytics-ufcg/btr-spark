@@ -7,3 +7,4 @@ src/java/best-trip-recommender/.project
 src/java/best-trip-recommender/.classpath
 src/java/best-trip-recommender/.gitignore
 src/java/best-trip-recommender/.settings/
+.idea/
