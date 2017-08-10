@@ -35,8 +35,8 @@ def data_pre_proc(df,
     df_r = pipeline.fit(df).transform(df)
 
     assembler = VectorAssembler(
-    inputCols=features,
-    outputCol='features')
+    inputCols = features + map(lambda c: c + "_index", string_columns),
+    outputCol = 'features')
 
     assembled_df = assembler.transform(df_r)
 
@@ -107,7 +107,5 @@ if __name__ == "__main__":
     save_model(duration_model, duration_model_path_to_save)
 
     duration_model_loaded = LinearRegressionModel.load(duration_model_path_to_save)
-
-    print duration_model_loaded.coefficients[0]
 
     sc.stop()
