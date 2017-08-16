@@ -8,10 +8,10 @@ from os.path import isfile, join, splitext
 import pyspark
 from pyspark import SparkContext
 from pyspark.sql.functions import lit, lead, udf, unix_timestamp, hour, when, weekofyear, date_format, dayofmonth, month
+import pyspark.sql.functions as func
 from pyspark.sql.window import Window
 from pyspark.sql.types import DoubleType, StringType
 
-from math import radians, cos, sin, asin, sqrt
 from datetime import datetime
 
 def read_file(filepath, sqlContext):
@@ -23,7 +23,7 @@ def read_file(filepath, sqlContext):
 
     date = "-".join(filepath.split("/")[-1].split("_")[:3])
 
-    data_frame = data_frame.withColumn("DATE", lit(date))
+    data_frame = data_frame.withColumn("date", lit(date))
 
     return data_frame
 
@@ -82,22 +82,6 @@ def rename_columns(df, list_of_tuples):
 
     return df
 
-def haversine(lon1, lat1, lon2, lat2):
-    """
-    Calculate the great circle distance between two points
-    on the earth (specified in decimal degrees)
-    """
-    # convert decimal degrees to radians
-    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
-
-    # haversine formula
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
-    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
-    c = 2 * asin(sqrt(a))
-    r = 6371 # Radius of earth in kilometers. Use 3956 for miles
-    return c * r
-
 def weekday(date, fmt = "%Y-%m-%d"):
     days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     wd = datetime.strptime(date, fmt).weekday()
@@ -105,58 +89,56 @@ def weekday(date, fmt = "%Y-%m-%d"):
 
 def extract_features(df):
     print "Inicial features"
-    print ["TRIP_NUM_ORIG", "ROUTE", "SHAPE_ID", "SHAPE_SEQ", "LAT_SHAPE_ORIG", "LON_SHAPE_ORIG", "GPS_POINT_ID",
-           "BUS_CODE", "TIMESTAMP_ORIG", "LAT_GPS", "LON_GPS", "DISTANCE_GPS_SHAPE", "THRESHOLD_PROBLEM",
-           "TRIP_PROBLEM", "STOP_ID_ORIG", "DATE", "STOP_ID_DEST", "TIMESTAMP_DEST", "TRIP_NUM_DEST", "LAT_SHAPE_DEST",
-           "LON_SHAPE_DEST"]
+    print ["tripNumOrig", "route", "shapeId", "shapeSequence", "shapeLatOrig", "shapeLonOrig", "gpsPointId",
+           "busCode", "timestampOrig", "gpsLat", "gpsLon", "distanceToShapePoint", "problem", "busStopIdOrig", "date",
+           "busStopIdDest", "timestampDest", "tripNumDest", "shapeLatDest", "shapeLonDest", "distanceTraveledShapeOrig",
+           "distanceTraveledShapeDest"]
 
     # Extract duration in seconds
     time_fmt = "HH:mm:ss"
-    time_difference = unix_timestamp("TIMESTAMP_DEST", time_fmt) - unix_timestamp("TIMESTAMP_ORIG", time_fmt)
-    df = df.withColumn("DURATION", time_difference)
+    time_difference = unix_timestamp("timestampDest", time_fmt) - unix_timestamp("timestampOrig", time_fmt)
+    df = df.withColumn("duration", time_difference)
 
+    # Extract total distance
+    df = df.withColumn("distance", func.abs(df.distanceTraveledShapeDest - df.distanceTraveledShapeOrig))
     # Extract hour
-    df = df.withColumn("HOUR_ORIG", hour("TIMESTAMP_ORIG"))
+    df = df.withColumn("hourOrig", hour("timestampOrig"))
     # Extract hour
-    df = df.withColumn("HOUR_DEST", hour("TIMESTAMP_DEST"))
+    df = df.withColumn("hourDest", hour("timestampDest"))
     # Extract is rush hour
-    rush_hours_orig = when((df.HOUR_ORIG == 6) | (df.HOUR_ORIG == 7) | (df.HOUR_ORIG == 11) | (df.HOUR_ORIG == 12) |
-                           (df.HOUR_ORIG == 17) | (df.HOUR_ORIG == 18), 1).otherwise(0)
-    df = df.withColumn("IS_RUSH_ORIG", rush_hours_orig)
+    rush_hours_orig = when((df.hourOrig == 6) | (df.hourOrig == 7) | (df.hourOrig == 11) | (df.hourOrig == 12) |
+                           (df.hourOrig == 17) | (df.hourOrig == 18), 1).otherwise(0)
+    df = df.withColumn("isRushOrig", rush_hours_orig)
     # Extract is rush hour
-    rush_hours_dest = when((df.HOUR_DEST == 6) | (df.HOUR_DEST == 7) | (df.HOUR_DEST == 11) | (df.HOUR_DEST == 12) |
-                           (df.HOUR_DEST == 17) | (df.HOUR_DEST == 18), 1).otherwise(0)
-    df = df.withColumn("IS_RUSH_DEST", rush_hours_dest)
+    rush_hours_dest = when((df.hourDest == 6) | (df.hourDest == 7) | (df.hourDest == 11) | (df.hourDest == 12) |
+                           (df.hourDest == 17) | (df.hourDest == 18), 1).otherwise(0)
+    df = df.withColumn("isRushDest", rush_hours_dest)
     # Extract period of day
-    period_orig = when(df.HOUR_ORIG < 12, "morning").otherwise(when((df.HOUR_ORIG >= 12) & (df.HOUR_ORIG < 18),
+    period_orig = when(df.hourOrig < 12, "morning").otherwise(when((df.hourOrig >= 12) & (df.hourOrig < 18),
                                                                     "afternoon").otherwise("night"))
-    df = df.withColumn("PERIOD_ORIG", period_orig)
+    df = df.withColumn("periodOrig", period_orig)
     # Extract period of day
-    period_dest = when(df.HOUR_DEST < 12, "morning").otherwise(when((df.HOUR_DEST >= 12) & (df.HOUR_DEST < 18),
+    period_dest = when(df.hourDest < 12, "morning").otherwise(when((df.hourDest >= 12) & (df.hourDest < 18),
                                                                     "afternoon").otherwise("night"))
-    df = df.withColumn("PERIOD_DEST", period_dest)
+    df = df.withColumn("periodDest", period_dest)
     # Extract week day
     udf_weekday = udf(weekday, StringType())
-    df = df.withColumn("WEEK_DAY", udf_weekday("DATE"))
+    df = df.withColumn("weekDay", udf_weekday("date"))
     # Extract week number
-    df = df.withColumn("WEEK_OF_YEAR", weekofyear("DATE"))
+    df = df.withColumn("weekOfYear", weekofyear("date"))
     # Extract day of month
-    df = df.withColumn("DAY_OF_MONTH", dayofmonth("DATE"))
+    df = df.withColumn("dayOfMonth", dayofmonth("date"))
     # Extract month
-    df = df.withColumn("MONTH", month("DATE"))
+    df = df.withColumn("month", month("date"))
     # Extract is holidays
-    is_holiday = when((df.MONTH == 1) | (df.MONTH == 6) | (df.MONTH == 7) | (df.MONTH == 12), 1).otherwise(0)
-    df = df.withColumn("IS_HOLIDAY", is_holiday)
+    is_holiday = when((df.month == 1) | (df.month == 6) | (df.month == 7) | (df.month == 12), 1).otherwise(0)
+    df = df.withColumn("isHoliday", is_holiday)
     # Extract is weekend
-    is_weekend = when((df.WEEK_DAY == "Sat") | (df.WEEK_DAY == "Sun"), 1).otherwise(0)
-    df = df.withColumn("IS_WEEKEND", is_weekend)
+    is_weekend = when((df.weekDay == "Sat") | (df.weekDay == "Sun"), 1).otherwise(0)
+    df = df.withColumn("isWeekend", is_weekend)
     # Extract is TUE, WED, THU
-    is_regular_day = when((df.WEEK_DAY == "Tue") | (df.WEEK_DAY == "Wed") | (df.WEEK_DAY == "Thu"), 1).otherwise(0)
-    df = df.withColumn("IS_REGULAR_DAY", is_regular_day)
-    # Extract total distance
-    haversine_udf = udf(haversine, DoubleType())
-    df = df.withColumn("TOTAL_DISTANCE", haversine_udf("LON_SHAPE_ORIG", "LAT_SHAPE_ORIG", "LON_SHAPE_DEST",
-                                                       "LAT_SHAPE_DEST"))
+    is_regular_day = when((df.weekDay == "Tue") | (df.weekDay == "Wed") | (df.weekDay == "Thu"), 1).otherwise(0)
+    df = df.withColumn("isRegularDay", is_regular_day)
 
     return df
 
@@ -175,18 +157,19 @@ if __name__ == "__main__":
 
     trips_df = read_files(btr_input_path, sqlContext)
 
-    stops_df = trips_df.na.drop(subset=["STOP_ID"])
+    stops_df = trips_df.na.drop(subset=["busStopId"])
 
-    w = Window().partitionBy("DATE", "ROUTE", "SHAPE_ID", "BUS_CODE").orderBy("TRIP_NUM", "TIMESTAMP")
+    w = Window().partitionBy("date", "route", "shapeId", "busCode").orderBy("tripNum", "timestamp")
 
     stops_df_lead = add_columns_lead(
         stops_df,
         [
-            ("STOP_ID", "STOP_ID_DEST"),
-            ("TIMESTAMP", "TIMESTAMP_DEST"),
-            ("TRIP_NUM", "TRIP_NUM_DEST"),
-            ("LAT_SHAPE", "LAT_SHAPE_DEST"),
-            ("LON_SHAPE", "LON_SHAPE_DEST")
+            ("busStopId", "busStopIdDest"),
+            ("timestamp", "timestampDest"),
+            ("tripNum", "tripNumDest"),
+            ("shapeLat", "shapeLatDest"),
+            ("shapeLon", "shapeLonDest"),
+            ("distanceTraveledShape", "distanceTraveledShapeDest")
         ],
         w
     )
@@ -194,16 +177,16 @@ if __name__ == "__main__":
     stops_df_lead = rename_columns(
         stops_df_lead,
         [
-            ("STOP_ID", "STOP_ID_ORIG"),
-            ("TIMESTAMP", "TIMESTAMP_ORIG"),
-            ("TRIP_NUM", "TRIP_NUM_ORIG"),
-            ("LAT_SHAPE", "LAT_SHAPE_ORIG"),
-            ("LON_SHAPE", "LON_SHAPE_ORIG"),
-            ("DISTANCE", "DISTANCE_GPS_SHAPE")
+            ("busStopId", "busStopIdOrig"),
+            ("timestamp", "timestampOrig"),
+            ("tripNum", "tripNumOrig"),
+            ("shapeLat", "shapeLatOrig"),
+            ("shapeLon", "shapeLonOrig"),
+            ("distanceTraveledShape", "distanceTraveledShapeOrig")
         ]
     )
 
-    stops_df_lead = stops_df_lead.na.drop(subset=["STOP_ID_DEST"])
+    stops_df_lead = stops_df_lead.na.drop(subset=["busStopIdDest"])
 
     print stops_df.show(10)
 
