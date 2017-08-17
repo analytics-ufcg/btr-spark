@@ -25,10 +25,10 @@ def read_data(sqlContext, filepath):
 
 
 def data_pre_proc(df,
-                  string_columns = ["busCode", "periodOrig", "periodDest", "weekDay", "route"],
-                  features=["tripNumOrig", "shapeId", "shapeSequence", "shapeLatOrig", "shapeLonOrig",
-                            "busStopIdOrig", "busStopIdDest", "tripNumDest", "shapeLatDest", "shapeLonDest",
-                            "hourOrig", "hourDest", "isRushOrig", "isRushDest", "weekOfYear", "dayOfMonth",
+                  string_columns = ["periodOrig", "weekDay", "route"],
+                  features=["tripNumOrig", "shapeId", "shapeLatOrig", "shapeLonOrig",
+                            "busStopIdOrig", "busStopIdDest", "shapeLatDest", "shapeLonDest",
+                            "hourOrig", "isRushOrig", "weekOfYear", "dayOfMonth",
                             "month", "isHoliday", "isWeekend", "isRegularDay", "distance"]):
 
     df = df.na.drop(subset = string_columns + features)
