@@ -19,19 +19,22 @@ def read_data(sqlContext, filepath):
         .option("nullValue", "-")\
         .load(filepath)
 
-    df = df.withColumn("DURATION", df.DURATION.cast('Double'))
+    df = df.withColumn("duration", df.duration.cast('Double'))
 
     return df
 
 
 def data_pre_proc(df,
-                  string_columns = ["BUS_CODE", "PERIOD_ORIG", "PERIOD_DEST", "WEEK_DAY"],
-                  features=["TRIP_NUM_ORIG", "ROUTE", "SHAPE_ID", "SHAPE_SEQ", "LAT_SHAPE_ORIG", "LON_SHAPE_ORIG",
-                            "STOP_ID_ORIG", "STOP_ID_DEST", "TRIP_NUM_DEST", "LAT_SHAPE_DEST", "LON_SHAPE_DEST",
-                            "HOUR_ORIG", "HOUR_DEST", "IS_RUSH_ORIG", "IS_RUSH_DEST", "WEEK_OF_YEAR", "DAY_OF_MONTH",
-                            "MONTH", "IS_HOLIDAY", "IS_WEEKEND", "IS_REGULAR_DAY", "TOTAL_DISTANCE"]):
+                  string_columns = ["busCode", "periodOrig", "periodDest", "weekDay", "route"],
+                  features=["tripNumOrig", "shapeId", "shapeSequence", "shapeLatOrig", "shapeLonOrig",
+                            "busStopIdOrig", "busStopIdDest", "tripNumDest", "shapeLatDest", "shapeLonDest",
+                            "hourOrig", "hourDest", "isRushOrig", "isRushDest", "weekOfYear", "dayOfMonth",
+                            "month", "isHoliday", "isWeekend", "isRegularDay", "distance"]):
+
+    df = df.na.drop(subset = string_columns + features)
+
     indexers = [StringIndexer(inputCol = column, outputCol = column + "_index").fit(df) for column in string_columns]
-    pipeline = Pipeline(stages=indexers)
+    pipeline = Pipeline(stages = indexers)
     df_r = pipeline.fit(df).transform(df)
 
     assembler = VectorAssembler(
@@ -44,7 +47,7 @@ def data_pre_proc(df,
 
 
 def train_duration_model(training_df):
-    duration_lr = LinearRegression(maxIter=10, regParam=0.01, elasticNetParam=1.0).setLabelCol("DURATION").setFeaturesCol("features")
+    duration_lr = LinearRegression(maxIter=10, regParam=0.01, elasticNetParam=1.0).setLabelCol("duration").setFeaturesCol("features")
 
     duration_lr_model = duration_lr.fit(training_df)
 
@@ -54,7 +57,7 @@ def train_duration_model(training_df):
 def getPredictionsLabels(model, test_data):
     predictions = model.transform(test_data)
 
-    return predictions.rdd.map(lambda row: (row.prediction, row.DURATION))
+    return predictions.rdd.map(lambda row: (row.prediction, row.duration))
 
 
 def save_train_info(model, predictions_and_labels, output, filepath = "hdfs://localhost:9000/btr/ctba/output.txt"):
