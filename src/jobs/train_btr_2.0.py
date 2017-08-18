@@ -24,9 +24,9 @@ def read_data(sqlContext, filepath):
     return df
 
 
-def data_pre_proc(df,
+def data_pre_proc(df, pipeline_path,
                   string_columns = ["periodOrig", "weekDay", "route"],
-                  features=["tripNumOrig", "shapeId", "shapeLatOrig", "shapeLonOrig",
+                  features=["shapeLatOrig", "shapeLonOrig",
                             "busStopIdOrig", "busStopIdDest", "shapeLatDest", "shapeLonDest",
                             "hourOrig", "isRushOrig", "weekOfYear", "dayOfMonth",
                             "month", "isHoliday", "isWeekend", "isRegularDay", "distance"]):
@@ -35,6 +35,9 @@ def data_pre_proc(df,
 
     indexers = [StringIndexer(inputCol = column, outputCol = column + "_index").fit(df) for column in string_columns]
     pipeline = Pipeline(stages = indexers)
+
+    pipeline.write().overwrite().save(pipeline_path)
+
     df_r = pipeline.fit(df).transform(df)
 
     assembler = VectorAssembler(
@@ -81,23 +84,23 @@ def save_model(model, filepath):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 4:
+    if len(sys.argv) < 5:
         print "Error: Wrong parameter specification!"
         print "Your command should be something like:"
         print "spark-submit --packages com.databricks:spark-csv_2.10:1.5.0 %s <training-data-path> " \
-              "<train-info-output-filepath> <duration-model-path-to-save>" % (sys.argv[0])
+              "<pipeline-path-to-save> <train-info-output-filepath> <duration-model-path-to-save>" % (sys.argv[0])
         sys.exit(1)
     elif not os.path.exists(sys.argv[1]):
         print "Error: training-data-filepath doesn't exist! You must specify a valid one!"
         sys.exit(1)
 
-    training_data_path, train_info_output_filepath, duration_model_path_to_save = sys.argv[1:5]
+    training_data_path, train_info_output_filepath, duration_model_path_to_save, pipeline_path = sys.argv[1:6]
 
     sc = SparkContext("local[*]", appName="train_btr_2.0")
     sqlContext = pyspark.SQLContext(sc)
     data = read_data(sqlContext, training_data_path)
 
-    preproc_data = data_pre_proc(data)
+    preproc_data = data_pre_proc(data, pipeline_path)
 
     train, test = preproc_data.randomSplit([0.7, 0.3], 24)
 
