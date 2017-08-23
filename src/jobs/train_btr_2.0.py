@@ -88,7 +88,7 @@ if __name__ == "__main__":
         print "Error: Wrong parameter specification!"
         print "Your command should be something like:"
         print "spark-submit --packages com.databricks:spark-csv_2.10:1.5.0 %s <training-data-path> " \
-              "<pipeline-path-to-save> <train-info-output-filepath> <duration-model-path-to-save>" % (sys.argv[0])
+              "<train-info-output-filepath> <duration-model-path-to-save> <pipeline-path-to-save>" % (sys.argv[0])
         sys.exit(1)
     elif not os.path.exists(sys.argv[1]):
         print "Error: training-data-filepath doesn't exist! You must specify a valid one!"
