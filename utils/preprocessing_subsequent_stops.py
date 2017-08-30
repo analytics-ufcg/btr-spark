@@ -27,11 +27,27 @@ def read_file(filepath, sqlContext):
 
     return data_frame
 
-def read_files(path, sqlContext):
+def read_files(path, sqlContext, sc):
     extension = splitext(path)[1]
 
     if extension == "":
-        files = [join(path, f) for f in listdir(path) if isfile(join(path, f))]
+        if "hdfs" in path:
+            URI = sc._gateway.jvm.java.net.URI
+            Path = sc._gateway.jvm.org.apache.hadoop.fs.Path
+            FileSystem = sc._gateway.jvm.org.apache.hadoop.fs.FileSystem
+            Configuration = sc._gateway.jvm.org.apache.hadoop.conf.Configuration
+
+            hdfs = "/".join(path.split("/")[:3])
+            dir = "/" + "/".join(path.split("/")[3:])
+
+            fs = FileSystem.get(URI(hdfs), Configuration())
+
+            status = fs.listStatus(Path(dir))
+
+            files = [str(file_status.getPath()) for file_status in status]
+
+        else:
+            files = [join(path, f) for f in listdir(path) if isfile(join(path, f))]
 
         return reduce(lambda df1, df2: df1.unionAll(df2),
                       map(lambda f: read_file(f, sqlContext), files))
@@ -155,7 +171,7 @@ if __name__ == "__main__":
     sc = SparkContext("local[*]", appName="btr_pre_processing")
     sqlContext = pyspark.SQLContext(sc)
 
-    trips_df = read_files(btr_input_path, sqlContext)
+    trips_df = read_files(btr_input_path, sqlContext, sc)
 
     stops_df = trips_df.na.drop(subset=["busStopId"])
 
