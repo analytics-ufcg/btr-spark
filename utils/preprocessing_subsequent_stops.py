@@ -158,15 +158,24 @@ def extract_features(df):
 
     return df
 
+def extract_routes_stops(df, routes_stops_output_path):
+    unique_stops_df = df.select("route", "shapeId", "busStopId", "distanceTraveledShape")\
+        .distinct()\
+        .orderBy("route", "shapeId", "distanceTraveledShape")
+
+    unique_stops_df.write.format("com.databricks.spark.csv") \
+        .save(routes_stops_output_path, mode="overwrite", header=True)
+
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
+    if len(sys.argv) < 4:
         print "Error! Your command must be something like:"
         print "spark-submit --packages com.databricks:spark-csv_2.10:1.5.0 %s <btr-input-path> " \
-              "<btr-pre-processing-output>" % (sys.argv[0])
+              "<btr-pre-processing-output> <routes-stops-output-path>" % (sys.argv[0])
         sys.exit(1)
 
     btr_input_path = sys.argv[1]
-    btr_pre_processing_output = sys.argv[2]
+    btr_pre_processing_output_path = sys.argv[2]
+    routes_stops_output_path = sys.argv[3]
 
     sc = SparkContext("local[*]", appName="btr_pre_processing")
     sqlContext = pyspark.SQLContext(sc)
@@ -174,6 +183,8 @@ if __name__ == "__main__":
     trips_df = read_files(btr_input_path, sqlContext, sc)
 
     stops_df = trips_df.na.drop(subset=["busStopId"])
+
+    extract_routes_stops(stops_df, routes_stops_output_path)
 
     w = Window().partitionBy("date", "route", "shapeId", "busCode").orderBy("tripNum", "timestamp")
 
@@ -211,6 +222,6 @@ if __name__ == "__main__":
     stops_df_lead = extract_features(stops_df_lead)
 
     stops_df_lead.write.format("com.databricks.spark.csv")\
-        .save(btr_pre_processing_output, mode="overwrite", header = True)
+        .save(btr_pre_processing_output_path, mode="overwrite", header = True)
 
     sc.stop()
