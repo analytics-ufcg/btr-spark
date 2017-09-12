@@ -90,9 +90,9 @@ if __name__ == "__main__":
         print "spark-submit --packages com.databricks:spark-csv_2.10:1.5.0 %s <training-data-path> " \
               "<train-info-output-filepath> <duration-model-path-to-save> <pipeline-path-to-save>" % (sys.argv[0])
         sys.exit(1)
-    elif not os.path.exists(sys.argv[1]):
-        print "Error: training-data-filepath doesn't exist! You must specify a valid one!"
-        sys.exit(1)
+    #elif not os.path.exists(sys.argv[1]):
+    #    print "Error: training-data-filepath doesn't exist! You must specify a valid one!"
+    #    sys.exit(1)
 
     training_data_path, train_info_output_filepath, duration_model_path_to_save, pipeline_path = sys.argv[1:6]
 
