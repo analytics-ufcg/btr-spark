@@ -1,0 +1,7 @@
+"0","qmap('Curitiba', zoom = 16)
+"
+"2","Map from URL : http://maps.googleapis.com/maps/api/staticmap?center=Curitiba&zoom=16&size=640x640&scale=2&maptype=terrain&language=en-EN&sensor=false
+"
+"2","Information from URL : http://maps.googleapis.com/maps/api/geocode/json?address=Curitiba&sensor=false
+"
+"2","`panel.margin` is deprecated. Please use `panel.spacing` property instead"

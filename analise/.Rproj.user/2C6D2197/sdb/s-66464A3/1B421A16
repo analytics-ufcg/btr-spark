@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "---\ntitle: \"Analise de pernas de ônibus\"\nauthor: \"Luiz Alberto Fonseca\"\ndate: \"September 5, 2017\"\noutput: html_document\n---\n\n```{r setup, include=FALSE}\nknitr::opts_chunk$set(echo = TRUE)\n```\n\n```{r}\nlibrary(readr)\nlibrary(ggplot2)\nlibrary(tidyverse)\n```\n\n\n```{r}\ndados.bulma <- read_csv(\"~/Analytics/MBServer/analise/dadostratados.csv\")\n```\n\nComparando a hora com as demais horas do dia\n(Para aquele dia, como se comporta aquela hora em comparação com as demais)\n\n```{r}\nsummarised.dates <- dados.bulma %>% group_by(date) %>%\n  summarise(meanDuration = mean(duration),\n            medianDuration = median(duration))\n\n\ntemp1 <- dados.bulma %>% select(date, hourOrig, hourDest, duration)\ntemp1 <- left_join(temp1, summarised.dates, by = \"date\")\n\n# Diferença entre cada duração e a duração mediana do dia\ntemp1 <- temp1 %>% mutate(\n  diffFromMedian = duration - median\n)\n\n# Mediana das diferenças por hora\ntemp2 <- temp1 %>% group_by(hourOrig) %>%\n  summarise(\n   medianOfDiffs = median(diffFromMedian)\n)\n\n# plot\nggplot(temp2, aes(as.factor(hourOrig), medianOfDiffs)) +\n  geom_bar(stat = \"identity\", fill = \"#2f4c56\", legend = FALSE) + \n  scale_y_continuous(\"Média das diferenças (em segundos)\") +\n  theme(axis.title.x = element_blank()) +\n  labs(title = \"Mediana das diferenças entre as durações de viagens e a duração mediana do dia\")\n\n```\n\n## Dia da semana\n```{r}\nsummarised.weeks <- dados.bulma %>% group_by(weekOfYear) %>%\n  summarise(medianWeek = median(duration))\n\ntemp3 <- dados.bulma %>% select(weekOfYear, weekDay, duration)\ntemp3 <- left_join(temp3, summarised.weeks, by = \"weekOfYear\")\n\n# Diferença entre cada duração e a duração mediana da semana\ntemp3 <- temp3 %>% mutate(\n  diffFromMedian = duration - medianWeek\n)\n\n# Mediana das diferenças por dia da semana\ntemp4 <- temp3 %>% group_by(weekDay) %>%\n  summarise(\n   medianOfDiffs = median(diffFromMedian)\n)\n\nggplot(temp4, aes(as.factor(weekDay), medianOfDiffs)) +\n  geom_bar(stat = \"identity\", fill = \"#2f4c56\", legend = FALSE) + \n  scale_y_continuous(\"Média das diferenças (em segundos)\") +\n  theme(axis.title.x = element_blank()) +\n  labs(title = \"Quanto (em média) a mediana das durações de cada dia da semana difere \\nda mediana das durações da semana\")\n```\n\n## Área da cidade\n\nideia: agrupar por paradas (origem e destino) e calcular a mediana da velocidade média entre essas paradas\n```{r}\nlibrary(ggmap)\n\ncity.area <- dados.bulma %>% select(shapeLatOrig, shapeLonOrig, busStopIdOrig, busStopIdDest, shapeLatDest, shapeLonDest, velocityKmh)\n\nqmap('Curitiba', zoom = 16)\n```\n\n",
+    "created" : 1505241941298.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2615226685",
+    "id" : "1B421A16",
+    "lastKnownWriteTime" : 1505246488,
+    "last_content_update" : 1505246488982,
+    "path" : "~/Analytics/MBServer/analise/analiseDeTrechos.Rmd",
+    "project_path" : "analiseDeTrechos.Rmd",
+    "properties" : {
+        "last_setup_crc32" : "27292B1Ebb338d19",
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}

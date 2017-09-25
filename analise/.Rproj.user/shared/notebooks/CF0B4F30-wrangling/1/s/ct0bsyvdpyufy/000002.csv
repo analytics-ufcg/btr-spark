@@ -1,0 +1,26 @@
+"0","library(plyr)
+"
+"2","--------------------------------------------------------------------------------------------------------------------------------------------------------------
+"
+"2","You have loaded plyr after dplyr - this is likely to cause problems.
+If you need functions from both plyr and dplyr, please load plyr first, then dplyr:
+library(plyr); library(dplyr)
+"
+"2","--------------------------------------------------------------------------------------------------------------------------------------------------------------
+"
+"2","
+Attaching package: ‘plyr’
+
+"
+"2","The following objects are masked from ‘package:dplyr’:
+
+    arrange, count, desc, failwith, id, mutate, rename, summarise, summarize
+
+"
+"2","The following object is masked from ‘package:purrr’:
+
+    compact
+
+"
+"0","library(tidyverse)"
+"0","library(ggplot2)"

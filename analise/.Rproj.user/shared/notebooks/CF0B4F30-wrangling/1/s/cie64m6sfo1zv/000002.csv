@@ -1,0 +1,3 @@
+"0","temp3 <- temp3 %>% mutate(velocityKmh = ((distance / duration) * 3.6))"
+"0","p <- ggplot(temp3, aes(x = ""velocidade"", y = velocityKmh, colour = problem))"
+"0","p + geom_jitter(aes(alpha = 0.5))"
