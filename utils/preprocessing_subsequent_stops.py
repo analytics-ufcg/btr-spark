@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
-from os import listdir
+from glob import glob
 from os.path import isfile, join, splitext
 
 import pyspark
@@ -21,7 +21,7 @@ def read_file(filepath, sqlContext):
         .option("nullValue", "-") \
         .load(filepath)
 
-    date = "-".join(filepath.split("/")[-1].split("_")[:3])
+    date = "-".join(filepath.split("/")[-2].split("_")[:3])
 
     data_frame = data_frame.withColumn("date", lit(date))
 
@@ -31,23 +31,24 @@ def read_files(path, sqlContext, sc):
     extension = splitext(path)[1]
 
     if extension == "":
+        path_pattern = path + "/*/part-*"
         if "hdfs" in path:
             URI = sc._gateway.jvm.java.net.URI
             Path = sc._gateway.jvm.org.apache.hadoop.fs.Path
             FileSystem = sc._gateway.jvm.org.apache.hadoop.fs.FileSystem
             Configuration = sc._gateway.jvm.org.apache.hadoop.conf.Configuration
 
-            hdfs = "/".join(path.split("/")[:3])
-            dir = "/" + "/".join(path.split("/")[3:])
+            hdfs = "/".join(path_pattern.split("/")[:3])
+            dir = "/" + "/".join(path_pattern.split("/")[3:])
 
             fs = FileSystem.get(URI(hdfs), Configuration())
 
-            status = fs.listStatus(Path(dir))
+            status = fs.globStatus(Path(dir))
 
-            files = [str(file_status.getPath()) for file_status in status]
+            files = map(lambda file_status: str(file_status.getPath()), status)
 
         else:
-            files = [join(path, f) for f in listdir(path) if isfile(join(path, f))]
+            files = glob(path_pattern)
 
         return reduce(lambda df1, df2: df1.unionAll(df2),
                       map(lambda f: read_file(f, sqlContext), files))
