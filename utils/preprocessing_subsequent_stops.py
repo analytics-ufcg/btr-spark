@@ -184,7 +184,7 @@ def clean_data(df):
     # Filter unreal (too fast) velocities
     df = df.filter(df.velocityKmh <= 90)
     # Filter the legs which did not have any problem during the trip or in the GPS measurement
-    df = df.filter(df.problem == "NO_PROBLEM" | df.problem == "BETWEEN")
+    df = df.filter('problem = "NO_PROBLEM" or problem = "BETWEEN"')
     # Filter durations under 1100 which represents a very small piece of data
     df = df.filter(df.duration <= 1100)
     return df
