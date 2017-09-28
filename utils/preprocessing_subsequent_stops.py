@@ -7,18 +7,41 @@ from os.path import isfile, join, splitext
 
 import pyspark
 from pyspark import SparkContext
-from pyspark.sql.functions import lit, lead, udf, unix_timestamp, hour, when, weekofyear, date_format, dayofmonth, month
+from pyspark.sql.functions import lit, lead, lag, udf, unix_timestamp, hour, when, weekofyear, date_format, dayofmonth, month
 import pyspark.sql.functions as func
 from pyspark.sql.window import Window
-from pyspark.sql.types import DoubleType, StringType
+from pyspark.sql.types import StructType, StructField, DoubleType, StringType, IntegerType
 
 from datetime import datetime
 
 def read_file(filepath, sqlContext):
+    schema = StructType([
+        StructField("route", StringType(), True),
+        StructField("tripNum", IntegerType(), True),
+        StructField("tripNum", IntegerType(), True),
+        StructField("shapeId", IntegerType(), True),
+        StructField("shapeId", IntegerType(), True),
+        StructField("shapeSequence", IntegerType(), True),
+        StructField("shapeLat", DoubleType(), True),
+        StructField("shapeLat", DoubleType(), True),
+        StructField("shapeLon", DoubleType(), True),
+        StructField("distanceTraveledShape", DoubleType(), True),
+        StructField("distanceTraveledShape", StringType(), True),
+        StructField("gpsPointId", IntegerType(), True),
+        StructField("gpsLat", IntegerType(), True),
+        StructField("gpsLon", IntegerType(), True),
+        StructField("distanceToShapePoint", DoubleType(), True),
+        StructField("timestamp", StringType(), True),
+        StructField("busStopId", IntegerType(), True),
+        StructField("problem", StringType(), True),
+        StructField("numPassengers", IntegerType(), True)
+        ])
+
     data_frame = sqlContext.read.format("com.databricks.spark.csv") \
-        .option("header", "true") \
+        .option("header", "false") \
         .option("inferSchema", "true") \
         .option("nullValue", "-") \
+        .option("schema", schema) \
         .load(filepath)
 
     date = "-".join(filepath.split("/")[-2].split("_")[:3])
@@ -75,6 +98,19 @@ def add_columns_lead(df, list_of_tuples, window):
 
     for (old_col, new_col) in list_of_tuples:
         df = df.withColumn(new_col, lead(old_col).over(window))
+
+    return df
+
+def add_accumulated_passengers(df, window):
+    """
+        :param df: Spark DataFrame
+
+        :param window: Spark Window to iterate over
+
+        :return: Spark DataFrame with accumulated number of passengers
+        """
+
+    df = df.withColumn("accumPassengers", lag("numPassengers").over(window) + df.numPassengers)
 
     return df
 
@@ -199,6 +235,11 @@ if __name__ == "__main__":
             ("shapeLon", "shapeLonDest"),
             ("distanceTraveledShape", "distanceTraveledShapeDest")
         ],
+        w
+    )
+
+    stops_df_lead = add_accumulated_passengers(
+        stops_df,
         w
     )
 
