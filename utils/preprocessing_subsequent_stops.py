@@ -4,6 +4,8 @@
 import sys
 from os import listdir
 from os.path import isfile, join, splitext
+import os
+os.environ["PYSPARK_PYTHON"] = "python2.7"
 
 import pyspark
 from pyspark import SparkContext

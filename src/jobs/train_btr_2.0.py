@@ -108,7 +108,7 @@ if __name__ == "__main__":
     duration_model = train_duration_model(train)
 
     predictions_and_labels = getPredictionsLabels(duration_model, test)
-    save_train_info(duration_model, predictions_and_labels, "Duration model\n", train_info_output_filepath)
+    #save_train_info(duration_model, predictions_and_labels, "Duration model\n", train_info_output_filepath)
 
     save_model(duration_model, duration_model_path_to_save)
 
