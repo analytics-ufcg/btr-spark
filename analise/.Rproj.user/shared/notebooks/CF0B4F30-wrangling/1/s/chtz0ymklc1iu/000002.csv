@@ -1,6 +1,0 @@
-"0","# Filtrando velocidades irreais (muito altas)"
-"0","temp4 <- temp3 %>% filter(velocityKmh <= 90)"
-"0","# filtrando viagens sem problemas"
-"0","temp5 <- temp4 %>% filter(problem == ""NO_PROBLEM"")"
-"0","p <- ggplot(temp5, aes(x = ""velocidade"", y = velocityKmh, colour = problem))"
-"0","p + geom_jitter(aes(alpha = 0.5))"

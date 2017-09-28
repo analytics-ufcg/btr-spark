@@ -1,2 +1,0 @@
-"0","p <- ggplot(temp5, aes(x = as.factor(hourOrig), y = duration, colour = problem))"
-"0","p + geom_jitter(aes(alpha = 0.5))"

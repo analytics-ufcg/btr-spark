@@ -1,0 +1,10 @@
+"0","m <- get_map(""Curitiba"",zoom=11,maptype=""roadmap"",source=""google"")
+"
+"2","Map from URL : http://maps.googleapis.com/maps/api/staticmap?center=Curitiba&zoom=11&size=640x640&scale=2&maptype=roadmap&language=en-EN&sensor=false
+"
+"2","Information from URL : http://maps.googleapis.com/maps/api/geocode/json?address=Curitiba&sensor=false
+"
+"2","geocode failed with status OVER_QUERY_LIMIT, location = ""Curitiba"""
+"2","Error in data.frame(ll.lat = ll[1], ll.lon = ll[2], ur.lat = ur[1], ur.lon = ur[2]) : 
+  arguments imply differing number of rows: 0, 1
+"

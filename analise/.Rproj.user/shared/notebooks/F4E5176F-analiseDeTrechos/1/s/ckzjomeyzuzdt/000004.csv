@@ -1,7 +1,0 @@
-"0","ggplot(temp4, aes(as.factor(weekDay), medianOfDiffs)) +
-  geom_bar(stat = ""identity"", fill = ""#2f4c56"", legend = FALSE) + 
-  scale_y_continuous(""Média das diferenças (em segundos)"") +
-  theme(axis.title.x = element_blank()) +
-  labs(title = ""Quanto (em média) a mediana das durações de cada dia da semana difere \nda mediana das durações da semana"")
-"
-"2","Ignoring unknown parameters: legend"
