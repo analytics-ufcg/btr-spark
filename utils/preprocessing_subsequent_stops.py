@@ -15,34 +15,33 @@ from pyspark.sql.types import StructType, StructField, DoubleType, StringType, I
 from datetime import datetime
 
 def read_file(filepath, sqlContext):
-    schema = StructType([
-        StructField("route", StringType(), True),
-        StructField("tripNum", IntegerType(), True),
-        StructField("tripNum", IntegerType(), True),
-        StructField("shapeId", IntegerType(), True),
-        StructField("shapeId", IntegerType(), True),
-        StructField("shapeSequence", IntegerType(), True),
-        StructField("shapeLat", DoubleType(), True),
-        StructField("shapeLat", DoubleType(), True),
-        StructField("shapeLon", DoubleType(), True),
-        StructField("distanceTraveledShape", DoubleType(), True),
-        StructField("distanceTraveledShape", StringType(), True),
-        StructField("gpsPointId", IntegerType(), True),
-        StructField("gpsLat", IntegerType(), True),
-        StructField("gpsLon", IntegerType(), True),
-        StructField("distanceToShapePoint", DoubleType(), True),
-        StructField("timestamp", StringType(), True),
-        StructField("busStopId", IntegerType(), True),
-        StructField("problem", StringType(), True),
-        StructField("numPassengers", IntegerType(), True)
-        ])
-
     data_frame = sqlContext.read.format("com.databricks.spark.csv") \
         .option("header", "false") \
         .option("inferSchema", "true") \
         .option("nullValue", "-") \
-        .option("schema", schema) \
         .load(filepath)
+
+    data_frame = rename_columns(
+        data_frame,
+        [
+            ("_c0", "route"),
+            ("_c1", "tripNum"),
+            ("_c2", "shapeId"),
+            ("_c3", "shapeSequence"),
+            ("_c4", "shapeLat"),
+            ("_c5", "shapeLon"),
+            ("_c6", "distanceTraveledShape"),
+            ("_c7", "busCode"),
+            ("_c8", "gpsPointId"),
+            ("_c9", "gpsLat"),
+            ("_c10", "gpsLon"),
+            ("_c11", "distanceToShapePoint"),
+            ("_c12", "timestamp"),
+            ("_c13", "busStopId"),
+            ("_c14", "problem"),
+            ("_c15", "numPassengers")
+        ]
+    )
 
     date = "-".join(filepath.split("/")[-2].split("_")[:3])
 
@@ -239,7 +238,7 @@ if __name__ == "__main__":
     )
 
     stops_df_lead = add_accumulated_passengers(
-        stops_df,
+        stops_df_lead,
         w
     )
 
