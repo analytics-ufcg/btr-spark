@@ -102,14 +102,14 @@ def add_columns_lead(df, list_of_tuples, window):
 
 def add_accumulated_passengers(df, window):
     """
-        :param df: Spark DataFrame
+    :param df: Spark DataFrame
 
-        :param window: Spark Window to iterate over
+    :param window: Spark Window to iterate over
 
-        :return: Spark DataFrame with accumulated number of passengers
-        """
+    :return: Spark DataFrame with accumulated number of passengers
+    """
 
-    df = df.withColumn("accumPassengers", lag("numPassengers").over(window) + df.numPassengers)
+    df = df.withColumn("accumPassengers", func.sum(df.numPassengers).over(w))
 
     return df
 
@@ -222,7 +222,7 @@ if __name__ == "__main__":
 
     extract_routes_stops(stops_df, routes_stops_output_path)
 
-    w = Window().partitionBy("date", "route", "shapeId", "busCode").orderBy("tripNum", "timestamp")
+    w = Window().partitionBy("date", "route", "shapeId", "busCode", "tripNum").orderBy("timestamp")
 
     stops_df_lead = add_columns_lead(
         stops_df,
