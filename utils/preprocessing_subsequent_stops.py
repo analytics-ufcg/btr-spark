@@ -109,7 +109,9 @@ def add_accumulated_passengers(df, window):
     :return: Spark DataFrame with accumulated number of passengers
     """
 
-    df = df.withColumn("accumPassengers", func.sum(df.numPassengers).over(w))
+    df = df.withColumn("accumPassengers", func.sum(df.numPassengers).over(window))
+
+    df = df.withColumn("teste", lag(df.numPassengers, count=2).over(window))
 
     return df
 
