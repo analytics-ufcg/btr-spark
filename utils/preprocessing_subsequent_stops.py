@@ -100,7 +100,7 @@ def add_columns_lead(df, list_of_tuples, window):
 
     return df
 
-def add_accumulated_passengers(df, window):
+def add_accumulated_passengers(df, window, num_stops=9, probs = [0.05, 0.05, 0.1, 0.15, 0.3, 0.15, 0.1, 0.05, 0.05]):
     """
     :param df: Spark DataFrame
 
@@ -109,9 +109,15 @@ def add_accumulated_passengers(df, window):
     :return: Spark DataFrame with accumulated number of passengers
     """
 
-    df = df.withColumn("accumPassengers", func.sum(df.numPassengers).over(window))
+    df = df.withColumn("acumPassengers", func.sum(df.numPassengers).over(window))
 
-    df = df.withColumn("teste", lag(df.numPassengers, count=2).over(window))
+    df = df.withColumn("probableNumPassengers", lit(0))
+    for i in range(num_stops):
+        df = df.withColumn("probableNumPassengers", df.probableNumPassengers - lag(df.numPassengers, count=i + 1, default=0).over(window) * probs[i])
+
+    df = df.withColumn("probableNumPassengers", df.numPassengers + df.probableNumPassengers)
+    df = df.withColumn("probableNumPassengers", func.sum(df.probableNumPassengers).over(window))
+    df = df.withColumn("probableNumPassengers", when(df.probableNumPassengers >= 0, df.probableNumPassengers).otherwise(0))
 
     return df
 
