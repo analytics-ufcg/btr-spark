@@ -64,51 +64,52 @@ ggplot(temp2, aes(as.factor(hourOrig), medianOfDiffs)) +
 temp2 <- NULL
 ```
 
-Podemos perceber que parece existir dois horários de pico, das 7 as 8 horas e das 14 as 18 horas.
-
-Vejamos se realmente existe uma diferença significativa:
+Podemos perceber que parece existir três horários de pico locais, das 7 às 8 horas, 12 às 13 e das 16 às 18 horas.
 
 ```{r, warning=F, message=F}
-set.seed(66)
+# Vejamos se realmente existe uma diferença significativa:
 
-boot.dados.bulma.by.hour <- dados.bulma %>% 
-  group_by(hourOrig) %>% 
-  summarise(
-    y.025 = CI.bca(bootstrap(data = duration, statistic = mean, seed = 66, R = 100), probs = c(.025, .975))[1],
-    y.975 = CI.bca(bootstrap(data = duration, statistic = mean, seed = 66, R = 100), probs = c(.025, .975))[2]
-  )
+# set.seed(66)
+# 
+# boot.dados.bulma.by.hour <- dados.bulma %>% 
+#   group_by(hourOrig) %>% 
+#   summarise(
+#     y.025 = CI.bca(bootstrap(data = duration, statistic = mean, seed = 66, R = 100), probs = c(.025, .975))[1],
+#     y.975 = CI.bca(bootstrap(data = duration, statistic = mean, seed = 66, R = 100), probs = c(.025, .975))[2]
+#   )
+# 
+# boot.dados.bulma.by.hour %>% 
+#   ggplot(aes(x = hourOrig, ymin = y.025, ymax = y.975)) +
+#   geom_errorbar()
+# boot.dados.bulma.by.hour <- NULL
 
-boot.dados.bulma.by.hour %>% 
-  ggplot(aes(x = hourOrig, ymin = y.025, ymax = y.975)) +
-  geom_errorbar()
-boot.dados.bulma.by.hour <- NULL
+# Podemos ver que os horários de pico determinados anteriormente, entre 7 e 8 horas tem viagens com duração maior que as anteriores e maiores que as viagens após as 19 horas, mas não se pode concluir nada sobre as demais. Definitivamente 18 horas é um horário de pico, visto que é maior que as demais.
 ```
-
-Podemos ver que os horários de pico determinados anteriormente, entre 7 e 8 horas tem viagens com duração maior que as anteriores e maiores que as viagens após as 19 horas, mas não se pode concluir nada sobre as demais. Definitivamente 18 horas é um horário de pico, visto que é maior que as demais.
 
 ## Dia da semana
-Vejamos agora as durações para cada dia da semana:
 
 ```{r, warning=F, message=F}
-boot.dados.bulma.by.weekday <- dados.bulma %>% 
-  group_by(weekDay) %>% 
-  summarise(
-    y.025 = CI.bca(bootstrap(data = duration, statistic = mean, seed = 66, R = 100), probs = c(.025, .975))[1],
-    y.975 = CI.bca(bootstrap(data = duration, statistic = mean, seed = 66, R = 100), probs = c(.025, .975))[2]
-  )
+# Vejamos agora as durações para cada dia da semana:
 
-boot.dados.bulma.by.weekday %>% 
-  mutate(weekDay = factor(weekDay, levels = c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"))) %>% 
-  arrange(weekDay) %>% 
-  ggplot(aes(x = weekDay, ymin = y.025, ymax = y.975)) +
-  geom_errorbar()
+# boot.dados.bulma.by.weekday <- dados.bulma %>% 
+#   group_by(weekDay) %>% 
+#   summarise(
+#     y.025 = CI.bca(bootstrap(data = duration, statistic = mean, seed = 66, R = 100), probs = c(.025, .975))[1],
+#     y.975 = CI.bca(bootstrap(data = duration, statistic = mean, seed = 66, R = 100), probs = c(.025, .975))[2]
+#   )
+# 
+# boot.dados.bulma.by.weekday %>% 
+#   mutate(weekDay = factor(weekDay, levels = c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"))) %>% 
+#   arrange(weekDay) %>% 
+#   ggplot(aes(x = weekDay, ymin = y.025, ymax = y.975)) +
+#   geom_errorbar()
+# 
+# boot.dados.bulma.by.weekday <- NULL
 
-boot.dados.bulma.by.weekday <- NULL
+# Podemos perceber que o dia em que os ônibus mais demoram é a segunda-feira, visto que é o único que existe uma diferença significativa de duração em relação aos demais. A quinta-feira também tem uma duração mais elevada quando comparada aos demais, exceto à segunda-feira e quarta-feira.
 ```
 
-Podemos perceber que o dia em que os ônibus mais demoram é a segunda-feira, visto que é o único que existe uma diferença significativa de duração em relação aos demais. A quinta-feira também tem uma duração mais elevada quando comparada aos demais, exceto à segunda-feira e quarta-feira.
-
-Vejamos agora outra abordagem, a diferença da duração da viagem em relação à duração mediana semanal.
+Vejamos agora a diferença da duração da viagem em relação à duração mediana semanal.
 
 ```{r, warning=F, message=F}
 summarised.weeks <- dados.bulma %>% group_by(weekOfYear) %>%
@@ -141,7 +142,7 @@ temp4 %>%
 temp4 <- NULL
 ```
 
-Podemos ber que, assim como visto acima, a segunda-feira é o dia que tem maior diferença da duração em relação a mediana semanal, seguido pela quinta-feira.
+Podemos ver que, a terça, quarta e quinta tem uma duração maior que as durações dos demais dias, com exceção do sábado.
 
 ## Área da cidade
 
@@ -152,12 +153,12 @@ m <- get_map("Curitiba",zoom=11,maptype="toner",source="stamen")
 
 g <- ggmap(m)
 m <- NULL
-g +
-  stat_density2d(aes(x = shapeLonOrig, y = shapeLatOrig, fill=duration, colour = duration), data=dados.bulma,geom="polygon", alpha=0.2, contour = T) +
-  scale_fill_gradient(low = "yellow", high = "red")
-```
+# g +
+#   stat_density2d(aes(x = shapeLonOrig, y = shapeLatOrig, fill=duration, colour = duration), data=dados.bulma,geom="polygon", alpha=0.2, contour = T) +
+#   scale_fill_gradient(low = "yellow", high = "red")
 
-Vemos que o centro da cidade tem maior quantidades de viagens.
+# Vemos que o centro da cidade tem maior quantidades de viagens.
+```
 
 Vejamos as viagens e suas durações individualmente
 
@@ -226,7 +227,7 @@ summarised.grid <- dados.bulma.grid %>%
 
 g +
   geom_tile(aes(x = plotting.lon, y = plotting.lat, fill = sqrt(median.duration)), data = summarised.grid, alpha = 0.5) + 
-  viridis::scale_fill_viridis(direction = -1, option = "magma")
+  viridis::scale_fill_viridis(direction = -1)
 summarised.grid <- NULL
 ```
 
@@ -263,7 +264,7 @@ hourly.summarised.joined.grid <- hourly.summarised.joined.grid %>%
 
 g +
   geom_tile(aes(x = plotting.lon, y = plotting.lat, fill = sqrt(positive.median.diff.duration)), data = hourly.summarised.joined.grid, alpha = 0.5) + 
-  viridis::scale_fill_viridis(direction = -1, option = "magma")
+  viridis::scale_fill_viridis(direction = -1)
 ```
 
 Podemos verificar que os mesmos corredores estão presentes ao plotar a diferença do horário para mediana de cada hora.
