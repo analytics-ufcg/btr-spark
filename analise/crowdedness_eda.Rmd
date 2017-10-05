@@ -1,0 +1,103 @@
+---
+title: "Análise de dados exploratória de lotação"
+output: html_document
+---
+
+```{r}
+library(plyr)
+library(tidyverse)
+```
+
+Importando os dados:
+
+```{r}
+path = "/local/orion/bigsea/btr_2.0/training_data2/"
+
+filenames <- list.files(path, pattern = "*.csv", full.names=TRUE)
+list_of_dataframes <- lapply(filenames, read.csv)
+filenames <- NULL
+busData <- rbind.fill(list_of_dataframes)
+list_of_dataframes <- NULL
+```
+
+```{r, warning=FALSE, message=FALSE}
+str(busData)
+```
+
+Podemos ver que existem 37 variáveis, onde temos:
+
+* route                    : rota do ônibus
+* tripNumOrig              : o número da viagem do ônibus na origem
+* shapeId                  : o id do shape do ônibus
+* shapeSequence            : o ponto do shape que a viagem está atualmente
+* shapeLatOrig             : a latitude da origem do shape
+* shapeLonOrig             : a longitude da origem do shape
+* distanceTraveledShapeOrig: a distancia que o ônibus já viajou na origem.
+* busCode                  : o código do ônibus
+* gpsPointId               : o id do ponto do gps
+* gpsLat                   : a latitude do ponto do gps
+* gpsLon                   : a longitude do ponto do gps
+* distanceToShapePoint     : a distância do gps para o ponto do shape casado
+* timestampOrig            : o horário no ponto de origem
+* busStopIdOrig            : a parada do ônibus no ponto de origem
+* problem                  : o tipo de problema encontrado pelo BULMA que pode ser NO_PROBLEM, quando não houver problema, NO_SHAPE, quando nenhuma trip foi formada (gps sem shape na base de dados ou com pontos insuficientes para formar trip), TRIP_PROBLEM, quando não foi possível identificar ponto final/ponto inicial, OUTLIER_POINT, quando os pontos excederam o threshold de distância para o shape.
+* date                     : a data da viagem
+* busStopIdDest            : o ponto de ônibus do destino
+* timestampDest            : o horário no ponto de destino
+* tripNumDest              : o número da viagem do ônibus no destino
+* shapeLatDest             : a latitude do ponto do shape destino
+* shapeLonDest             : a longitude do ponto do shape destino
+* distanceTraveledShapeDest: a distancia que o ônibus já viajou no destino
+* acumPassengers           : número de passageiros acumulado durante a viagem
+* probableNumPassengers    : número provável de passageiros durante a viagem, estimando a descida dos mesmos
+* duration                 : a duração entre a parada origem e destino
+* distance                 : a distancia entre a parada origem e destino
+* hourOrig                 : a hora de origem
+* hourDest                 : a hora de destino
+* isRushOrig               : indicativo se está em horário de pico na origem
+* isRushDest               : indicativo se está me horário de pico no destino
+* periodOrig               : o período na origem (manhã, tarde, noite)
+* periodDest               : o período no destino (manhã, tarde, noite)
+* weekDay                  : o dia da semana
+* weekOfYear               : a semana do ano
+* dayOfMonth               : o dia do mês
+* month                    : o mês
+* isHoliday                : indicativo se está em mês de férias
+* isWeekend                : indicativo se é final de semana
+* isRegularDay             : indicativo se está entre a terça e quinta inclusive
+
+Análises posssíveis:
+
+2) um panorama das distâncias entre as paradas
+3) um panorama do número de shapes por rota
+4) um panorama do número de paradas por shape
+5) um panorama do tamanho dos shapes
+6) Relação entre lotação entre uma parada e outra e a distância entre essas paradas
+7) panorama do periodo do dia e lotação da viagem entre duas paradas
+8) Panorama entre o dia da semana e a lotação da viagem entre duas paradas
+
+analises que queremos:
+
+1) Relação entre a hora do dia e lotação de uma viagem entre duas paradas
+2) Relação entre o dia da semana e a lotação de uma viagem entre duas paradas
+3) Relação entre a área da cidade e a lotação de uma viagem entre duas paradas
+
+## Hora do dia
+Agora vamos plotar um gráfico de lotação de viagens entre paradas por horas do dia.
+```{r, warning=FALSE, message=FALSE}
+p <- ggplot(busData, aes(x = as.factor(hourOrig), y = probableNumPassengers, colour = problem))
+p + geom_jitter(aes(alpha = 0.5))
+p <- NULL
+```
+
+Podemos perceber que muitas viagens têm lotação baixa, existindo alguns outliers.
+
+Vejamos outra visualização para que fique mais nítido:
+
+```{r}
+ggplot(busData, aes(x = as.factor(hourOrig), y = probableNumPassengers)) + 
+  geom_boxplot()
+```
+
+
+Podemos ver que grande parte do tempo os ônibus permanecem vazios, ou com poucas pessoas. Talvez isso indique que as pessoas andem mais paradas dentro do ônibus do que o algoritmo de pre-processamento esta estimando. Em compensação existem valores muito altos, onde o maior chega a 150.
