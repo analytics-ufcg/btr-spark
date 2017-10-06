@@ -14,6 +14,8 @@ from pyspark.sql.types import StructType, StructField, DoubleType, StringType, I
 
 from datetime import datetime
 
+import random
+
 def read_file(filepath, sqlContext):
     data_frame = sqlContext.read.format("com.databricks.spark.csv") \
         .option("header", "false") \
@@ -100,7 +102,7 @@ def add_columns_lead(df, list_of_tuples, window):
 
     return df
 
-def add_accumulated_passengers(df, window, num_stops=9, probs = [0.05, 0.05, 0.1, 0.15, 0.3, 0.15, 0.1, 0.05, 0.05]):
+def add_accumulated_passengers(df, window, probs = [0.025, 0.025, 0.05, 0.06, 0.075, 0.08, 0.11, 0.15, 0.11, 0.08, 0.075, 0.06, 0.05, 0.025, 0.025]):
     """
     :param df: Spark DataFrame
 
@@ -112,7 +114,7 @@ def add_accumulated_passengers(df, window, num_stops=9, probs = [0.05, 0.05, 0.1
     df = df.withColumn("acumPassengers", func.sum(df.numPassengers).over(window))
 
     df = df.withColumn("probableNumPassengers", lit(0))
-    for i in range(num_stops):
+    for i in range(len(probs)):
         df = df.withColumn("probableNumPassengers", df.probableNumPassengers - lag(df.numPassengers, count=i + 1, default=0).over(window) * probs[i])
 
     df = df.withColumn("probableNumPassengers", df.numPassengers + df.probableNumPassengers)
@@ -210,6 +212,21 @@ def extract_routes_stops(df, routes_stops_output_path):
     unique_stops_df.write.format("com.databricks.spark.csv") \
         .save(routes_stops_output_path, mode="overwrite", header=True)
 
+def get_normal_distribution_list(mu, sigma, l_size):
+    dist = list()
+    for i in range(l_size):
+        dist.append(random.gauss(mu, sigma))
+    dist_sum = sum(dist)
+    norm_dist = map(lambda v: v / dist_sum, dist)
+    norm_dist.sort()
+    norm_dist_sorted = [0] * l_size
+    for i in range(l_size):
+        if i % 2 == 0:
+            norm_dist_sorted[i/2] = norm_dist[i]
+        else:
+            norm_dist_sorted[-1 * (i + 1) / 2] = norm_dist[i]
+    return norm_dist_sorted
+
 if __name__ == "__main__":
     if len(sys.argv) < 4:
         print "Error! Your command must be something like:"
@@ -245,9 +262,12 @@ if __name__ == "__main__":
         w
     )
 
+
+
     stops_df_lead = add_accumulated_passengers(
         stops_df_lead,
-        w
+        w,
+        probs=get_normal_distribution_list(30, 5, 40)
     )
 
     stops_df_lead = rename_columns(
