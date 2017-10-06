@@ -3,14 +3,14 @@ title: "Análise de dados exploratória de lotação"
 output: html_document
 ---
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 library(plyr)
 library(tidyverse)
 ```
 
 Importando os dados:
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 path = "/local/orion/bigsea/btr_2.0/training_data2/"
 
 filenames <- list.files(path, pattern = "*.csv", full.names=TRUE)
@@ -20,7 +20,7 @@ busData <- rbind.fill(list_of_dataframes)
 list_of_dataframes <- NULL
 ```
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, warning=FALSE, message=FALSE}
 str(busData)
 ```
 
@@ -84,7 +84,7 @@ analises que queremos:
 
 ## Hora do dia
 Agora vamos plotar um gráfico de lotação de viagens entre paradas por horas do dia.
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, warning=FALSE, message=FALSE}
 p <- ggplot(busData, aes(x = as.factor(hourOrig), y = probableNumPassengers, colour = problem))
 p + geom_jitter(aes(alpha = 0.5))
 p <- NULL
@@ -94,7 +94,7 @@ Podemos perceber que muitas viagens têm lotação baixa, existindo alguns outli
 
 Vejamos outra visualização para que fique mais nítido:
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 ggplot(busData, aes(x = as.factor(hourOrig), y = probableNumPassengers)) + 
   geom_boxplot()
 ```

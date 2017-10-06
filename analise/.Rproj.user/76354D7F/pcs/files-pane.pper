@@ -1,9 +1,0 @@
-{
-    "path" : "~/Documents/best-trip-recommender-spark/analise",
-    "sortOrder" : [
-        {
-            "ascending" : true,
-            "columnIndex" : 2
-        }
-    ]
-}
