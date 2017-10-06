@@ -82,18 +82,14 @@ def read_files(path, sqlContext, sc):
 def add_columns_lead(df, list_of_tuples, window):
     """
     :param df: Spark DataFrame
-
     :param list_of_tuples:
     Ex:
-
     [
         ("old_column_1", "new_column_1"),
         ("old_column_2", "new_column_2"),
         ("old_column_3", "new_column_3")
     ]
-
     :param window: Spark Window to iterate over
-
     :return: Spark DataFrame with new columns
     """
 
@@ -105,9 +101,7 @@ def add_columns_lead(df, list_of_tuples, window):
 def add_accumulated_passengers(df, window, probs = [0.025, 0.025, 0.05, 0.06, 0.075, 0.08, 0.11, 0.15, 0.11, 0.08, 0.075, 0.06, 0.05, 0.025, 0.025]):
     """
     :param df: Spark DataFrame
-
     :param window: Spark Window to iterate over
-
     :return: Spark DataFrame with accumulated number of passengers
     """
 
@@ -126,16 +120,13 @@ def add_accumulated_passengers(df, window, probs = [0.025, 0.025, 0.05, 0.06, 0.
 def rename_columns(df, list_of_tuples):
     """
     :param df: Spark DataFrame
-
     :param list_of_tuples:
     Ex:
-
     [
         ("old_column_1", "new_column_1"),
         ("old_column_2", "new_column_2"),
         ("old_column_3", "new_column_3")
     ]
-
     :return: Spark DataFrame columns renamed
     """
 
@@ -267,7 +258,7 @@ if __name__ == "__main__":
     stops_df_lead = add_accumulated_passengers(
         stops_df_lead,
         w,
-        probs=get_normal_distribution_list(30, 5, 40)
+        probs=get_normal_distribution_list(40, 10, 66)
     )
 
     stops_df_lead = rename_columns(
