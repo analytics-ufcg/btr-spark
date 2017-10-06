@@ -11,7 +11,7 @@ library(tidyverse)
 Importando os dados:
 
 ```{r, warning=FALSE, message=FALSE}
-path = "/local/orion/bigsea/btr_2.0/training_data2/"
+path = "/local/orion/bigsea/btr_2.0/training_data3/"
 
 filenames <- list.files(path, pattern = "*.csv", full.names=TRUE)
 list_of_dataframes <- lapply(filenames, read.csv)
@@ -24,7 +24,7 @@ list_of_dataframes <- NULL
 str(busData)
 ```
 
-Podemos ver que existem 37 variáveis, onde temos:
+Podemos ver que existem 40 variáveis, onde temos:
 
 * route                    : rota do ônibus
 * tripNumOrig              : o número da viagem do ônibus na origem
@@ -41,6 +41,7 @@ Podemos ver que existem 37 variáveis, onde temos:
 * timestampOrig            : o horário no ponto de origem
 * busStopIdOrig            : a parada do ônibus no ponto de origem
 * problem                  : o tipo de problema encontrado pelo BULMA que pode ser NO_PROBLEM, quando não houver problema, NO_SHAPE, quando nenhuma trip foi formada (gps sem shape na base de dados ou com pontos insuficientes para formar trip), TRIP_PROBLEM, quando não foi possível identificar ponto final/ponto inicial, OUTLIER_POINT, quando os pontos excederam o threshold de distância para o shape.
+* numPassengers            : a quantidade de passageiros que subiu no ônibus em determinada parada
 * date                     : a data da viagem
 * busStopIdDest            : o ponto de ônibus do destino
 * timestampDest            : o horário no ponto de destino
@@ -82,6 +83,19 @@ analises que queremos:
 2) Relação entre o dia da semana e a lotação de uma viagem entre duas paradas
 3) Relação entre a área da cidade e a lotação de uma viagem entre duas paradas
 
+Vejamos primeiramente qual a quantidade de paradas que cara rota tem:
+
+```{r, warning=FALSE, message=FALSE}
+gp.bus.data <- busData %>% distinct(route, busStopIdOrig) %>% group_by(route) %>% summarise(num.stops = n())
+
+summary(gp.bus.data)
+ggplot(gp.bus.data, aes("num.stops", num.stops)) + geom_boxplot()
+
+gp.bus.data <- NULL
+```
+
+Vemos que a mediana de paradas de uma rota é 66, sendo seu primeiro quartil 43 e o terceiro 98.75
+
 ## Hora do dia
 Agora vamos plotar um gráfico de lotação de viagens entre paradas por horas do dia.
 ```{r, warning=FALSE, message=FALSE, warning=FALSE, message=FALSE}
@@ -99,5 +113,28 @@ ggplot(busData, aes(x = as.factor(hourOrig), y = probableNumPassengers)) +
   geom_boxplot()
 ```
 
+Podemos ver que grande parte do tempo os ônibus permanecem vazios, ou com poucas pessoas. Talvez isso indique que as pessoas andem mais paradas dentro do ônibus do que o algoritmo de pre-processamento esta estimando. Em compensação existem valores muito altos, onde o maior chega a mais de 300, que é um erro gerado pela estimativa.
 
-Podemos ver que grande parte do tempo os ônibus permanecem vazios, ou com poucas pessoas. Talvez isso indique que as pessoas andem mais paradas dentro do ônibus do que o algoritmo de pre-processamento esta estimando. Em compensação existem valores muito altos, onde o maior chega a 150.
+Vamos ver se o problema das viagens identificado pelo BULMA tem relação com a quantidade provável de passageiros:
+
+```{r, warning=FALSE, message=FALSE}
+ggplot(busData, aes(x = as.factor(hourOrig), y = probableNumPassengers)) + 
+  geom_boxplot() +
+  facet_wrap(~problem)
+```
+
+Podemos verificar que a quantidade de passageiros dentro do ônibus continua pequena, mesmo separando os tipos de problema das viagens identificados pelo BULMA.
+
+Vejamos se a lotação é influenciada pelos dias da semana
+
+```{r, warning=FALSE, message=FALSE}
+busData <- busData %>% 
+  mutate(
+    weekDay = factor(weekDay, levels = c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"))
+  )
+
+ggplot(busData, aes(x = weekDay, y = probableNumPassengers)) +
+  geom_boxplot()
+```
+
+Vemos que os dias não parecem influenciar a quantidade mediana de passageiros.
