@@ -301,7 +301,7 @@ Podemos verificar que as periferias tem um número maior de passageiros e os mes
 
 Como os corredores da cidade tem valores de duração alto e de lotação baixos, vejamos se existe uma correlação entre a duração e lotação:
 
-```{r}
+```{r, warning=F, message=F}
 ggplot(busData, aes(x = duration, y = probableNumPassengers)) +
   geom_point() +
   geom_smooth(method = "lm")
@@ -309,7 +309,7 @@ ggplot(busData, aes(x = duration, y = probableNumPassengers)) +
 
 Vamos filtrar os valores entre o 5 percentil e o 95 percentil:
 
-```{r}
+```{r, warning=F, message=F}
 duration.percentiles <- quantile(busData$duration, c(.05, .95), na.rm = TRUE)
 passengers.percentiles <- quantile(busData$probableNumPassengers, c(.05, .95), na.rm = TRUE)
 
@@ -345,3 +345,4 @@ d2 <- NULL
 busData <- NULL
 ```
 
+Vemos que não existe correlação significativa entre a duração e a quantidade de passageiros.
