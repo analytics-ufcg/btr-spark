@@ -23,6 +23,10 @@ def read_file(filepath, sqlContext):
         .option("nullValue", "-") \
         .load(filepath)
 
+    while len(data_frame.columns) < 16:
+        col_name = "_c" + str(len(data_frame.columns))
+        data_frame = data_frame.withColumn(col_name, lit(None))
+
     data_frame = rename_columns(
         data_frame,
         [
