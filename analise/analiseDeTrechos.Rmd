@@ -233,7 +233,7 @@ summarised.grid <- NULL
 
 Podemos ver que realmente existem trechos da cidade que tem a duração maior.
 
-Vejamos o quanto que esses trechos se diferenciam da mediana durante:
+Vejamos o quanto que esses trechos se diferenciam da mediana durante a semana:
 
 ```{r, warning=F, message=F}
 hour.median.duration <- dados.bulma %>% 

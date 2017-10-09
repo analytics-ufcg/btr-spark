@@ -20,7 +20,7 @@ busData <- rbind.fill(list_of_dataframes)
 list_of_dataframes <- NULL
 ```
 
-```{r, warning=FALSE, message=FALSE, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE}
 str(busData)
 ```
 
@@ -104,7 +104,7 @@ p + geom_jitter(aes(alpha = 0.5))
 p <- NULL
 ```
 
-Podemos perceber que muitas viagens têm lotação baixa, existindo alguns outliers.
+Podemos perceber que muitas viagens têm lotação baixa, mas também existem uma grande quantidade de quantidade de passageiros com valores consideráveis e outros que parecem ser outliers.
 
 Vejamos outra visualização para que fique mais nítido:
 
@@ -125,6 +125,39 @@ ggplot(busData, aes(x = as.factor(hourOrig), y = probableNumPassengers)) +
 
 Podemos verificar que a quantidade de passageiros dentro do ônibus continua pequena, mesmo separando os tipos de problema das viagens identificados pelo BULMA.
 
+Vejamos a mediana da quantidade provável de passageiros por hora do dia:
+
+```{r, warning=FALSE, message=FALSE}
+summarised.dates <- busData %>% group_by(date) %>%
+  summarise(meanCrowdedness = mean(probableNumPassengers),
+            medianCrowdedness = median(probableNumPassengers))
+
+temp1 <- busData %>% select(date, hourOrig, hourDest, probableNumPassengers)
+temp1 <- left_join(temp1, summarised.dates, by = "date")
+summarised.dates <- NULL
+
+temp1 <- temp1 %>% mutate(
+  diffFromMedian = probableNumPassengers - medianCrowdedness
+)
+
+temp2 <- temp1 %>% group_by(hourOrig) %>%
+  summarise(
+   medianOfDiffs = median(diffFromMedian)
+)
+temp1 <- NULL
+
+ggplot(temp2, aes(as.factor(hourOrig), medianOfDiffs)) +
+  geom_bar(stat = "identity", fill = "#2f4c56", legend = FALSE) + 
+  scale_y_continuous("Média das diferenças (em quantidade de passageiros)") +
+  theme(axis.title.x = element_blank()) +
+  labs(title = "Mediana das diferenças entre número de passageiros de viagens e a quantidade de passageiros mediana do dia")
+temp2 <- NULL
+```
+
+Vemos que existe um pico logo no início da manhã sobre a quantidade de passageiros, o qual tem um retorno perto do meio dia e final da tarde.
+
+##Dia da semana
+
 Vejamos se a lotação é influenciada pelos dias da semana
 
 ```{r, warning=FALSE, message=FALSE}
@@ -138,3 +171,177 @@ ggplot(busData, aes(x = weekDay, y = probableNumPassengers)) +
 ```
 
 Vemos que os dias não parecem influenciar a quantidade mediana de passageiros.
+
+```{r, warning=FALSE, message=FALSE}
+summarised.weeks <- busData %>% group_by(weekOfYear) %>%
+  summarise(medianWeek = median(probableNumPassengers))
+
+temp3 <- busData %>% select(weekOfYear, weekDay, probableNumPassengers)
+temp3 <- left_join(temp3, summarised.weeks, by = "weekOfYear")
+summarised.weeks <- NULL
+
+temp3 <- temp3 %>% mutate(
+  diffFromMedian = probableNumPassengers - medianWeek
+)
+
+temp4 <- temp3 %>% group_by(weekDay) %>%
+  summarise(
+   medianOfDiffs = median(diffFromMedian)
+)
+temp3 <- NULL
+
+temp4 %>% 
+  mutate(weekDay = factor(weekDay, levels = c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"))) %>% 
+  arrange(weekDay) %>% 
+  ggplot(aes(as.factor(weekDay), medianOfDiffs)) +
+    geom_bar(stat = "identity", fill = "#2f4c56", legend = FALSE) + 
+    scale_y_continuous("Média das diferenças (em número de passageiros)") +
+    theme(axis.title.x = element_blank()) +
+    labs(title = "Quanto (em média) a mediana da quantidade de passageiros de cada dia da \nsemana diferencia da mediana das quantidades de passageiros da semana")
+temp4 <- NULL
+```
+
+Vemos que a segunda feira é o dia que mais se diferencia, tendo a menor quantidade de passageiros da semana.
+
+##Área da cidade
+```{r, warning=FALSE, message=FALSE}
+library(ggmap)
+
+m <- get_map("Curitiba",zoom=11,maptype="toner",source="stamen")
+
+g <- ggmap(m)
+m <- NULL
+```
+
+Vamos fazer um grid com a latitude entre -25.67 e -25.33 e longitude entre -49.40 e -49.07.
+
+```{r, warning=F, message=F}
+lat.min <- -25.67
+lat.max <- -25.32
+lon.min <- -49.40
+lon.max <- -49.07
+
+lat.step <- (lat.max - lat.min) / 50
+lon.step <- (lon.max - lon.min) / 50
+
+bus.data.grid <- busData %>% 
+  mutate(
+    lat.grid.index = floor((shapeLatOrig - lat.min) / lat.step),
+    lon.grid.index = floor((shapeLonOrig - lon.min) / lon.step)
+  )
+```
+
+Vejamos a quantidade de passageiros mediana em um mapa:
+
+```{r, warning=F, message=F}
+bus.data.grid <- bus.data.grid %>% 
+  mutate(
+    plotting.lat = lat.min + (lat.grid.index * lat.step + (lat.grid.index + 1) * lat.step) / 2,
+    plotting.lon = lon.min + (lon.grid.index * lon.step + (lon.grid.index + 1) * lon.step) / 2
+  )
+
+summarised.grid <- bus.data.grid %>% 
+  group_by(plotting.lat, plotting.lon) %>% 
+  summarise(
+    median.num.passengers = median(probableNumPassengers)
+  )
+
+g +
+  geom_tile(aes(x = plotting.lon, y = plotting.lat, fill = median.num.passengers), data = summarised.grid, alpha = 0.5) + 
+  viridis::scale_fill_viridis(direction = -1)
+```
+
+Podemos ver que realmente existem trechos da cidade que tem a duração maior.
+
+Vamos atenuar os valores maiores para verificar a região que tem maior concentração de passageiros:
+
+```{r, warning=FALSE, message=FALSE}
+g +
+  geom_tile(aes(x = plotting.lon, y = plotting.lat, fill = sqrt(median.num.passengers)), data = summarised.grid, alpha = 0.5) + 
+  viridis::scale_fill_viridis(direction = -1)
+summarised.grid <- NULL
+```
+ 
+Podemos ver que ao contrário da duração, os corredores da cidade tem ter valores menores de passageiros.
+
+Vejamos o quanto que esses trechos se diferenciam da mediana durante a semana:
+
+```{r, warning=F, message=F}
+hour.median.num.passengers <- busData %>% 
+  group_by(hourOrig) %>% 
+  summarise(
+    median.num.passengers = median(probableNumPassengers)
+  )
+
+joined.grid <- left_join(bus.data.grid, hour.median.num.passengers, by = "hourOrig") %>% 
+  mutate(diff.num.passengers = probableNumPassengers - median.num.passengers)
+hour.median.num.passengers <- NULL
+bus.data.grid <- NULL
+
+hourly.summarised.joined.grid <- joined.grid %>% 
+  group_by(plotting.lat, plotting.lon) %>% 
+  summarise(
+    median.diff.num.passengers = median(diff.num.passengers)
+  )
+joined.grid <- NULL
+
+min.median.diff.num.passengers <- min(hourly.summarised.joined.grid$median.diff.num.passengers)
+
+hourly.summarised.joined.grid <- hourly.summarised.joined.grid %>% 
+  mutate(
+    positive.median.diff.num.passengers = median.diff.num.passengers + abs(min.median.diff.num.passengers)
+  )
+
+g +
+  geom_tile(aes(x = plotting.lon, y = plotting.lat, fill = positive.median.diff.num.passengers), data = hourly.summarised.joined.grid, alpha = 0.5) + 
+  viridis::scale_fill_viridis(direction = -1)
+```
+
+Podemos verificar que as periferias tem um número maior de passageiros e os mesmos corredores mencionados anteriormente tem duração inferior as demais regiões.
+
+Como os corredores da cidade tem valores de duração alto e de lotação baixos, vejamos se existe uma correlação entre a duração e lotação:
+
+```{r}
+ggplot(busData, aes(x = duration, y = probableNumPassengers)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+```
+
+Vamos filtrar os valores entre o 5 percentil e o 95 percentil:
+
+```{r}
+duration.percentiles <- quantile(busData$duration, c(.05, .95), na.rm = TRUE)
+passengers.percentiles <- quantile(busData$probableNumPassengers, c(.05, .95), na.rm = TRUE)
+
+bus.data.filt <- busData %>%
+  filter(
+    duration > duration.percentiles[1],
+    duration < duration.percentiles[2],
+    probableNumPassengers > passengers.percentiles[1],
+    probableNumPassengers < passengers.percentiles[2]
+  )
+
+ggplot(bus.data.filt, aes(x = duration, y = probableNumPassengers)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+d2 <- busData %>% 
+  select(duration, probableNumPassengers) %>% 
+  mutate(
+    lg.duration = log(duration),
+    lg.probableNumPassengers = log(probableNumPassengers)
+    ) %>%
+  filter(
+    !is.nan(lg.duration) &
+      !is.nan(lg.probableNumPassengers) &
+      !is.na(lg.duration) & 
+      !is.na(lg.probableNumPassengers) & 
+      !is.infinite(lg.duration) & 
+      !is.infinite(lg.probableNumPassengers)
+    )
+cor(d2$lg.duration, d2$lg.probableNumPassengers)
+
+d2 <- NULL
+busData <- NULL
+```
+
