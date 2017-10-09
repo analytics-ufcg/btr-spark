@@ -51,7 +51,7 @@ def read_file(filepath, sqlContext):
 
     return data_frame
 
-def read_files(path, sqlContext, sc):
+def read_files(path, sqlContext, sc, initial_date, final_date):
     extension = splitext(path)[1]
 
     if extension == "":
@@ -73,6 +73,13 @@ def read_files(path, sqlContext, sc):
 
         else:
             files = glob(path_pattern)
+
+        print files
+
+        files = filter(lambda f: initial_date <= datetime.strptime(f.split("/")[-2], '%Y_%m_%d_veiculos.csv') <=
+                                 final_date, files)
+
+        print files
 
         return reduce(lambda df1, df2: df1.unionAll(df2),
                       map(lambda f: read_file(f, sqlContext), files))
@@ -219,20 +226,23 @@ def get_normal_distribution_list(mu, sigma, l_size):
     return norm_dist_sorted
 
 if __name__ == "__main__":
-    if len(sys.argv) < 4:
+    if len(sys.argv) < 6:
         print "Error! Your command must be something like:"
         print "spark-submit --packages com.databricks:spark-csv_2.10:1.5.0 %s <btr-input-path> " \
-              "<btr-pre-processing-output> <routes-stops-output-path>" % (sys.argv[0])
+              "<btr-pre-processing-output> <routes-stops-output-path> <initial-date(YYYY-MM-DD)> " \
+              "<final-date(YYYY-MM-DD)>" % (sys.argv[0])
         sys.exit(1)
 
     btr_input_path = sys.argv[1]
     btr_pre_processing_output_path = sys.argv[2]
     routes_stops_output_path = sys.argv[3]
+    initial_date = datetime.strptime(sys.argv[4], '%Y-%m-%d')
+    final_date = datetime.strptime(sys.argv[5], '%Y-%m-%d')
 
-    sc = SparkContext("local[*]", appName="btr_pre_processing")
+    sc = SparkContext(appName="btr_pre_processing")
     sqlContext = pyspark.SQLContext(sc)
 
-    trips_df = read_files(btr_input_path, sqlContext, sc)
+    trips_df = read_files(btr_input_path, sqlContext, sc, initial_date, final_date)
 
     stops_df = trips_df.na.drop(subset=["busStopId"])
 
