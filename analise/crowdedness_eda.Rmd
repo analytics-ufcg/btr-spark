@@ -6,6 +6,7 @@ output: html_document
 ```{r, warning=FALSE, message=FALSE}
 library(plyr)
 library(tidyverse)
+library(ggmap)
 ```
 
 Importando os dados:
@@ -94,12 +95,49 @@ ggplot(gp.bus.data, aes("num.stops", num.stops)) + geom_boxplot()
 gp.bus.data <- NULL
 ```
 
-Vemos que a mediana de paradas de uma rota é 66, sendo seu primeiro quartil 43 e o terceiro 98.75
+Vemos que a mediana é de 66 paradas, o primeiro quartil sendo 43 e o terceiro sendo 98.75 paradas.
+
+Vejamos agora a quantidade de pessoas que sobem por paradas nas diferentes rotas:
+
+```{r, warning=FALSE, message=FALSE}
+gp.bus.crowdedness <- busData %>% 
+  group_by(route) %>% 
+  summarise(
+    max.entered.passengers = max(numPassengers, na.rm = TRUE),
+    median.entered.passengers = median(numPassengers, na.rm = TRUE),
+    median.crowdedness = median(probableNumPassengers)    
+  )
+
+ggplot(gp.bus.crowdedness, aes(x = "num.passengers", max.entered.passengers)) +
+  geom_boxplot()
+
+gp.bus.crowdedness %>% 
+  arrange(max.entered.passengers) %>% 
+  head(30)
+```
+
+Vemos que existem muitas rotas que não entram pessoas no ônibus. Com isso, vamos filtrar as rotas que não entram pessoas:
+
+```{r}
+gp.bus.crowdedness.positive.passengers <- gp.bus.crowdedness %>% 
+  filter(max.entered.passengers > 0)
+
+  ggplot(gp.bus.crowdedness.positive.passengers, aes(x = "num.passengers", max.entered.passengers)) +
+    geom_boxplot()
+```
+
+Apesar de uma pequena diferença, vamos prosseguir na filtragem:
+
+```{r}
+bus.data.filt <- busData %>%
+  filter(route %in% gp.bus.crowdedness.positive.passengers$route)
+busData <- NULL
+```
 
 ## Hora do dia
 Agora vamos plotar um gráfico de lotação de viagens entre paradas por horas do dia.
 ```{r, warning=FALSE, message=FALSE, warning=FALSE, message=FALSE}
-p <- ggplot(busData, aes(x = as.factor(hourOrig), y = probableNumPassengers, colour = problem))
+p <- ggplot(bus.data.filt, aes(x = as.factor(hourOrig), y = probableNumPassengers, colour = problem))
 p + geom_jitter(aes(alpha = 0.5))
 p <- NULL
 ```
@@ -109,7 +147,7 @@ Podemos perceber que muitas viagens têm lotação baixa, mas também existem um
 Vejamos outra visualização para que fique mais nítido:
 
 ```{r, warning=FALSE, message=FALSE}
-ggplot(busData, aes(x = as.factor(hourOrig), y = probableNumPassengers)) + 
+ggplot(bus.data.filt, aes(x = as.factor(hourOrig), y = probableNumPassengers)) + 
   geom_boxplot()
 ```
 
@@ -118,7 +156,7 @@ Podemos ver que grande parte do tempo os ônibus permanecem vazios, ou com pouca
 Vamos ver se o problema das viagens identificado pelo BULMA tem relação com a quantidade provável de passageiros:
 
 ```{r, warning=FALSE, message=FALSE}
-ggplot(busData, aes(x = as.factor(hourOrig), y = probableNumPassengers)) + 
+ggplot(bus.data.filt, aes(x = as.factor(hourOrig), y = probableNumPassengers)) + 
   geom_boxplot() +
   facet_wrap(~problem)
 ```
@@ -128,11 +166,11 @@ Podemos verificar que a quantidade de passageiros dentro do ônibus continua peq
 Vejamos a mediana da quantidade provável de passageiros por hora do dia:
 
 ```{r, warning=FALSE, message=FALSE}
-summarised.dates <- busData %>% group_by(date) %>%
+summarised.dates <- bus.data.filt %>% group_by(date) %>%
   summarise(meanCrowdedness = mean(probableNumPassengers),
             medianCrowdedness = median(probableNumPassengers))
 
-temp1 <- busData %>% select(date, hourOrig, hourDest, probableNumPassengers)
+temp1 <- bus.data.filt %>% select(date, hourOrig, hourDest, probableNumPassengers)
 temp1 <- left_join(temp1, summarised.dates, by = "date")
 summarised.dates <- NULL
 
@@ -161,22 +199,22 @@ Vemos que existe um pico logo no início da manhã sobre a quantidade de passage
 Vejamos se a lotação é influenciada pelos dias da semana
 
 ```{r, warning=FALSE, message=FALSE}
-busData <- busData %>% 
+bus.data.filt <- bus.data.filt %>% 
   mutate(
     weekDay = factor(weekDay, levels = c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"))
   )
 
-ggplot(busData, aes(x = weekDay, y = probableNumPassengers)) +
+ggplot(bus.data.filt, aes(x = weekDay, y = probableNumPassengers)) +
   geom_boxplot()
 ```
 
 Vemos que os dias não parecem influenciar a quantidade mediana de passageiros.
 
 ```{r, warning=FALSE, message=FALSE}
-summarised.weeks <- busData %>% group_by(weekOfYear) %>%
+summarised.weeks <- bus.data.filt %>% group_by(weekOfYear) %>%
   summarise(medianWeek = median(probableNumPassengers))
 
-temp3 <- busData %>% select(weekOfYear, weekDay, probableNumPassengers)
+temp3 <- bus.data.filt %>% select(weekOfYear, weekDay, probableNumPassengers)
 temp3 <- left_join(temp3, summarised.weeks, by = "weekOfYear")
 summarised.weeks <- NULL
 
@@ -205,8 +243,6 @@ Vemos que a segunda feira é o dia que mais se diferencia, tendo a menor quantid
 
 ##Área da cidade
 ```{r, warning=FALSE, message=FALSE}
-library(ggmap)
-
 m <- get_map("Curitiba",zoom=11,maptype="toner",source="stamen")
 
 g <- ggmap(m)
@@ -224,7 +260,7 @@ lon.max <- -49.07
 lat.step <- (lat.max - lat.min) / 50
 lon.step <- (lon.max - lon.min) / 50
 
-bus.data.grid <- busData %>% 
+bus.data.grid <- bus.data.filt %>% 
   mutate(
     lat.grid.index = floor((shapeLatOrig - lat.min) / lat.step),
     lon.grid.index = floor((shapeLonOrig - lon.min) / lon.step)
@@ -267,7 +303,7 @@ Podemos ver que ao contrário da duração, os corredores da cidade tem ter valo
 Vejamos o quanto que esses trechos se diferenciam da mediana durante a semana:
 
 ```{r, warning=F, message=F}
-hour.median.num.passengers <- busData %>% 
+hour.median.num.passengers <- bus.data.filt %>% 
   group_by(hourOrig) %>% 
   summarise(
     median.num.passengers = median(probableNumPassengers)
@@ -302,7 +338,7 @@ Podemos verificar que as periferias tem um número maior de passageiros e os mes
 Como os corredores da cidade tem valores de duração alto e de lotação baixos, vejamos se existe uma correlação entre a duração e lotação:
 
 ```{r, warning=F, message=F}
-ggplot(busData, aes(x = duration, y = probableNumPassengers)) +
+ggplot(bus.data.filt, aes(x = duration, y = probableNumPassengers)) +
   geom_point() +
   geom_smooth(method = "lm")
 ```
@@ -310,10 +346,10 @@ ggplot(busData, aes(x = duration, y = probableNumPassengers)) +
 Vamos filtrar os valores entre o 5 percentil e o 95 percentil:
 
 ```{r, warning=F, message=F}
-duration.percentiles <- quantile(busData$duration, c(.05, .95), na.rm = TRUE)
-passengers.percentiles <- quantile(busData$probableNumPassengers, c(.05, .95), na.rm = TRUE)
+duration.percentiles <- quantile(bus.data.filt$duration, c(.05, .95), na.rm = TRUE)
+passengers.percentiles <- quantile(bus.data.filt$probableNumPassengers, c(.05, .95), na.rm = TRUE)
 
-bus.data.filt <- busData %>%
+bus.data.filt <- bus.data.filt %>%
   filter(
     duration > duration.percentiles[1],
     duration < duration.percentiles[2],
@@ -325,7 +361,7 @@ ggplot(bus.data.filt, aes(x = duration, y = probableNumPassengers)) +
   geom_point() +
   geom_smooth(method = "lm")
 
-d2 <- busData %>% 
+d2 <- bus.data.filt %>% 
   select(duration, probableNumPassengers) %>% 
   mutate(
     lg.duration = log(duration),
@@ -342,7 +378,7 @@ d2 <- busData %>%
 cor(d2$lg.duration, d2$lg.probableNumPassengers)
 
 d2 <- NULL
-busData <- NULL
+bus.data.filt <- NULL
 ```
 
 Vemos que não existe correlação significativa entre a duração e a quantidade de passageiros.
