@@ -56,6 +56,13 @@ def train_duration_model(training_df):
 
     return duration_lr_model
 
+def train_crowdedness_model(training_df):
+    crowdedness_lr = LinearRegression(maxIter=10, regParam=0.01, elasticNetParam=1.0).setLabelCol("probableNumPassengers").setFeaturesCol("features")
+
+    crowdedness_lr_model = crowdedness_lr.fit(training_df)
+
+    return crowdedness_lr_model
+
 
 def getPredictionsLabels(model, test_data):
     predictions = model.transform(test_data)
@@ -88,15 +95,15 @@ if __name__ == "__main__":
         print "Error: Wrong parameter specification!"
         print "Your command should be something like:"
         print "spark-submit --packages com.databricks:spark-csv_2.10:1.5.0 %s <training-data-path> " \
-              "<train-info-output-filepath> <duration-model-path-to-save> <pipeline-path-to-save>" % (sys.argv[0])
+              "<train-info-output-filepath> <duration-model-path-to-save> <crowdedness-model-path-to-save> <pipeline-path-to-save>" % (sys.argv[0])
         sys.exit(1)
     #elif not os.path.exists(sys.argv[1]):
     #    print "Error: training-data-filepath doesn't exist! You must specify a valid one!"
     #    sys.exit(1)
 
-    training_data_path, train_info_output_filepath, duration_model_path_to_save, pipeline_path = sys.argv[1:6]
+    training_data_path, train_info_output_filepath, duration_model_path_to_save, crowdedness_model_path_to_save, pipeline_path = sys.argv[1:7]
 
-    sc = SparkContext("local[*]", appName="train_btr_2.0")
+    sc = SparkContext(appName="train_btr_2.0")
     sqlContext = pyspark.SQLContext(sc)
     data = read_data(sqlContext, training_data_path)
 
@@ -106,12 +113,18 @@ if __name__ == "__main__":
 
     # Duration
     duration_model = train_duration_model(train)
+    # Crowdedness
+    crowdedness_model = train_crowdedness_model(train)
 
-    predictions_and_labels = getPredictionsLabels(duration_model, test)
-    save_train_info(duration_model, predictions_and_labels, "Duration model\n", train_info_output_filepath)
+    duration_predictions_and_labels = getPredictionsLabels(duration_model, test)
+    crowdedness_predictions_and_labels = getPredictionsLabels(crowdedness_model, test)
+
+    #save_train_info(duration_model, duration_predictions_and_labels, "Duration model\n", train_info_output_filepath)
+    #save_train_info(crowdedness_model, crowdedness_predictions_and_labels, "Crowdedness model\n", train_info_output_filepath)
 
     save_model(duration_model, duration_model_path_to_save)
+    save_model(crowdedness_model, crowdedness_model_path_to_save)
 
-    duration_model_loaded = LinearRegressionModel.load(duration_model_path_to_save)
+    #duration_model_loaded = LinearRegressionModel.load(duration_model_path_to_save)
 
     sc.stop()

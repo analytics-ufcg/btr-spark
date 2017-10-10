@@ -221,7 +221,7 @@ if __name__ == "__main__":
     btr_pre_processing_output_path = sys.argv[2]
     routes_stops_output_path = sys.argv[3]
 
-    sc = SparkContext("local[*]", appName="btr_pre_processing")
+    sc = SparkContext(appName="btr_pre_processing")
     sqlContext = pyspark.SQLContext(sc)
 
     trips_df = read_files(btr_input_path, sqlContext, sc)
