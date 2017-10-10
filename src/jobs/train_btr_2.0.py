@@ -119,9 +119,6 @@ if __name__ == "__main__":
     duration_predictions_and_labels = getPredictionsLabels(duration_model, test)
     crowdedness_predictions_and_labels = getPredictionsLabels(crowdedness_model, test)
 
-
-    predictions_and_labels = getPredictionsLabels(duration_model, test)
-
     #save_train_info(duration_model, duration_predictions_and_labels, "Duration model\n", train_info_output_filepath)
     #save_train_info(crowdedness_model, crowdedness_predictions_and_labels, "Crowdedness model\n", train_info_output_filepath)
 
