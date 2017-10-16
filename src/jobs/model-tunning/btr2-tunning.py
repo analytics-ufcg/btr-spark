@@ -8,6 +8,7 @@ from pyspark.ml.feature import StringIndexer
 from pyspark.ml.regression import LinearRegressionModel, LinearRegression
 from pyspark.ml.tuning import CrossValidator, ParamGridBuilder
 from pyspark.ml.evaluation import RegressionEvaluator
+from pyspark.mllib.evaluation import RegressionMetrics
 
 string_columns = ["periodOrig", "weekDay", "route"]
 features=["shapeLatOrig", "shapeLonOrig", "busStopIdOrig",
@@ -68,15 +69,39 @@ def train_gbt(train_data):
     cvModel = crossval.fit(train_data)
     return cvModel;
 
+# exemplo de chamada: save_train_info(cvModel, "Lasso", <nome do arquivo para salvar os resultados>)
+def save_train_info(model, model_name, filepath):
+    output = model_name + "\n"
+    with open(filepath, 'a') as outfile:
+        output += "Model:\n"
+        output += "Coefficients: %s\n" % str(model.coefficients)
+        output += "Intercept: %s\n" % str(model.intercept)
+        output += "Model info\n"
+
+        trainingSummary = RegressionMetrics(predictions_and_labels)
+
+        output += "RMSE: %f\n" % trainingSummary.rootMeanSquaredError
+        output += "MAE: %f\n" % trainingSummary.meanAbsoluteError
+        output += "r2: %f\n" % trainingSummary.r2
+
+        outfile.write(output)
+
+def getPredictionsLabels(model, test_data):
+    predictions = model.transform(test_data)
+    return predictions.rdd.map(lambda row: (row.prediction, row.duration))
+
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print "Error: Wrong parameter specification!"
         print "Your command should be something like:"
-        print "spark-submit --packages com.databricks:spark-csv_2.10:1.5.0 %s <training-data-path> <duration-model-path>" % (sys.argv[0])
+        print "spark-submit --packages com.databricks:spark-csv_2.10:1.5.0 %s <training-data-path> <train-start-date> <train-end-date> <test-end-date> <duration-model-path>" % (sys.argv[0])
         sys.exit(1)
 
     training_data_path = sys.argv[1]
-    filepath = sys.argv[2]
+    train_start_date = sys.argv[2]
+    train_end_date = sys.argv[3]
+    test_end_date = sys.argv[4]
+    filepath = sys.argv[5]
 	pipelineStages = []
 
     sc = SparkContext(appName="train_btr_2.0")
@@ -104,6 +129,7 @@ if __name__ == "__main__":
 
 	train_data = pipeline.fit(training).transform(training)
 
-    model = train_lasso(train_data)
-
-    model.bestModel.write().overwrite().save(filepath)
+    # A partir daqui deve-se rodar os modelos e salvar os resultados separadamente
+    # model = train_lasso(train_data)
+    #
+    # model.bestModel.write().overwrite().save(filepath)
