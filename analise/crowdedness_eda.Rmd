@@ -12,7 +12,7 @@ library(ggmap)
 Importando os dados:
 
 ```{r, warning=FALSE, message=FALSE}
-path = "/local/orion/bigsea/btr_2.0/training_data3/"
+path = "/local/orion/bigsea/btr_2.0/training_data2/"
 
 filenames <- list.files(path, pattern = "*.csv", full.names=TRUE)
 list_of_dataframes <- lapply(filenames, read.csv)
@@ -136,7 +136,7 @@ busData <- NULL
 
 ## Hora do dia
 Agora vamos plotar um gráfico de lotação de viagens entre paradas por horas do dia.
-```{r, warning=FALSE, message=FALSE, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE}
 p <- ggplot(bus.data.filt, aes(x = as.factor(hourOrig), y = probableNumPassengers, colour = problem))
 p + geom_jitter(aes(alpha = 0.5))
 p <- NULL
