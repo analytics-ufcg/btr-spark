@@ -10,26 +10,23 @@ from pyspark.ml.tuning import CrossValidator, ParamGridBuilder
 from pyspark.ml.evaluation import RegressionEvaluator
 from pyspark.mllib.evaluation import RegressionMetrics
 
-string_columns = ["periodOrig", "weekDay", "route"]
-features=["shapeLatOrig", "shapeLonOrig", "busStopIdOrig",
-            "busStopIdDest", "shapeLatDest", "shapeLonDest",
-			"hourOrig", "isRushOrig", "weekOfYear", "dayOfMonth",
-			"month", "isHoliday", "isWeekend", "isRegularDay", "distance"]
+import sys
 
 def train_lasso(train_data):
     duration_lr = LinearRegression(elasticNetParam=1.0, labelCol="duration")
 
-	paramGrid = ParamGridBuilder() \
-	.addGrid(duration_lr.maxIter, [10, 20]) \
+    paramGrid = ParamGridBuilder() \
+    .addGrid(duration_lr.maxIter, [10, 20]) \
     .addGrid(duration_lr.regParam, [0.1, 0.01]) \
     .build()
 
-	crossval = CrossValidator(estimator=duration_lr,
-                          estimatorParamMaps=paramGrid,
-                          evaluator=RegressionEvaluator(labelCol="duration"),
-                          numFolds=5)
+    crossval = CrossValidator(estimator=duration_lr,
+                              estimatorParamMaps=paramGrid,
+                              evaluator=RegressionEvaluator(labelCol="duration"),
+                              numFolds=2)
 
-	cvModel = crossval.fit(train_data)
+    cvModel = crossval.fit(train_data)
+
     return cvModel
 
 def train_rf(train_data):
@@ -90,31 +87,12 @@ def getPredictionsLabels(model, test_data):
     predictions = model.transform(test_data)
     return predictions.rdd.map(lambda row: (row.prediction, row.duration))
 
-if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print "Error: Wrong parameter specification!"
-        print "Your command should be something like:"
-        print "spark-submit --packages com.databricks:spark-csv_2.10:1.5.0 %s <training-data-path> <train-start-date> <train-end-date> <test-end-date> <duration-model-path>" % (sys.argv[0])
-        sys.exit(1)
+def build_features_pipeline(string_columns = ["periodOrig", "weekDay", "route"],
+                            features=["shapeLatOrig", "shapeLonOrig", "busStopIdOrig",
+                             "busStopIdDest", "shapeLatDest", "shapeLonDest", "hourOrig",
+                             "isRushOrig", "weekOfYear", "dayOfMonth", "month", "isHoliday", "isWeekend", "isRegularDay", "distance"]):
 
-    training_data_path = sys.argv[1]
-    train_start_date = sys.argv[2]
-    train_end_date = sys.argv[3]
-    test_end_date = sys.argv[4]
-    filepath = sys.argv[5]
-	pipelineStages = []
-
-    sc = SparkContext(appName="train_btr_2.0")
-    sqlContext = pyspark.SQLContext(sc)
-
-    training_raw = sqlContext.read.format("com.databricks.spark.csv")\
-        .option("header", "true")\
-        .option("inferSchema", "true")\
-        .option("nullValue", "-")\
-        .load(training_data_path)
-
-	training = training_raw.withColumn("duration", training_raw.duration.cast('Double'))\
-		.na.drop(subset = string_columns + features)
+    pipelineStages = []
 
     indexers = [StringIndexer(inputCol = column, outputCol = column + "_index") for column in string_columns]
 
@@ -122,12 +100,54 @@ if __name__ == "__main__":
         inputCols = features + map(lambda c: c + "_index", string_columns),
         outputCol = 'features')
 
-	pipelineStages = pipelineStages + indexers
-	pipelineStages.append(assembler)
+    pipelineStages = pipelineStages + indexers
+    pipelineStages.append(assembler)
 
-	pipeline = Pipeline(stages = pipelineStages)
+    pipeline = Pipeline(stages = pipelineStages)
 
-	train_data = pipeline.fit(training).transform(training)
+    return pipeline
+
+def read_data(datapath, string_columns = ["periodOrig", "weekDay", "route"],
+                            features=["shapeLatOrig", "shapeLonOrig", "busStopIdOrig",
+                             "busStopIdDest", "shapeLatDest", "shapeLonDest", "hourOrig",
+                             "isRushOrig", "weekOfYear", "dayOfMonth", "month", "isHoliday", "isWeekend", "isRegularDay", "distance"]):
+
+    training_raw = sqlContext.read.format("com.databricks.spark.csv")\
+        .option("header", "true")\
+        .option("inferSchema", "true")\
+        .option("nullValue", "-")\
+        .load(datapath)
+
+    training = training_raw.withColumn("duration", training_raw.duration.cast('Double'))\
+    	.na.drop(subset = string_columns + features)
+
+    return training
+
+if __name__ == "__main__":
+    # if len(sys.argv) < 3:
+    #     print "Error: Wrong parameter specification!"
+    #     print "Your command should be something like:"
+    #     print "spark-submit --packages com.databricks:spark-csv_2.10:1.5.0 %s <training-data-path> <train-start-date> <train-end-date> <test-end-date> <duration-model-path>" % (sys.argv[0])
+    #     sys.exit(1)
+
+    training_data_path = sys.argv[1]
+    # train_start_date = sys.argv[2]
+    # train_end_date = sys.argv[3]
+    # test_end_date = sys.argv[4]
+    # filepath = sys.argv[5]
+
+    sc = SparkContext(appName="train_btr_2.0")
+    sqlContext = pyspark.SQLContext(sc)
+
+    raw_data = read_data(training_data_path)
+
+    pipeline = build_features_pipeline()
+
+    train_data = pipeline.fit(raw_data).transform(raw_data)
+
+    bestModel = train_lasso(train_data).bestModel
+
+    print bestModel.coefficients
 
     # A partir daqui deve-se rodar os modelos e salvar os resultados separadamente
     # model = train_lasso(train_data)
