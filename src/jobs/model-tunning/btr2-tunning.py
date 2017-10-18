@@ -3,6 +3,7 @@ from pyspark import SparkContext
 from pyspark.ml.feature import VectorAssembler
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import StringIndexer
+from pyspark.sql.types import StringType
 
 # MLlib
 from pyspark.ml.regression import LinearRegressionModel, LinearRegression
@@ -11,9 +12,10 @@ from pyspark.ml.evaluation import RegressionEvaluator
 from pyspark.mllib.evaluation import RegressionMetrics
 
 import sys
+from datetime import datetime
 
-def train_lasso(train_data):
-    duration_lr = LinearRegression(elasticNetParam=1.0, labelCol="duration")
+def train_lasso(train_data, test_data, label, file_to_save):
+    duration_lr = LinearRegression(elasticNetParam=1.0).setLabelCol(label).setFeaturesCol("features")
 
     paramGrid = ParamGridBuilder() \
     .addGrid(duration_lr.maxIter, [10, 20]) \
@@ -22,17 +24,19 @@ def train_lasso(train_data):
 
     crossval = CrossValidator(estimator=duration_lr,
                               estimatorParamMaps=paramGrid,
-                              evaluator=RegressionEvaluator(labelCol="duration"),
-                              numFolds=2)
+                              evaluator=RegressionEvaluator(labelCol=label),
+                              numFolds=5)
 
     cvModel = crossval.fit(train_data)
 
+    save_test_info(cvModel.bestModel, test_data, label + "-lasso", file_to_save)
+
     return cvModel
 
-def train_rf(train_data):
+def train_rf(train_data, test_data, label, file_to_save):
     route_arity = train_data.select('route').distinct().count()
 
-    duration_rf = RandomForest.trainRegressor(train_data, {0:route_arity, 31:3, 33: 7}, 5)
+    duration_rf = RandomForest.trainRegressor(train_data, {0:route_arity, 31:3, 33: 7}, 5).setLabelCol(label).setFeaturesCol("features")
 
     paramGrid = (ParamGridBuilder()
              .addGrid(duration_rf.maxDepth, [2, 4, 6])
@@ -42,16 +46,19 @@ def train_rf(train_data):
 
     crossval = CrossValidator(estimator=duration_rf,
                         estimatorParamMaps=paramGrid,
-                        evaluator=RegressionEvaluator(labelCol="duration"),
+                        evaluator=RegressionEvaluator(labelCol=label),
                         numFolds=5)
 
     cvModel = crossval.fit(train_data)
+
+    save_train_info(cvModel.bestModel, test_data, "random-forest", file_to_save)
+
     return cvModel;
 
-def train_gbt(train_data):
+def train_gbt(train_data, test_data, label, file_to_save):
     route_arity = train_data.select('route').distinct().count()
 
-    duration_gbt = GradientBoostedTrees.trainRegressor(train_data, {0:route_arity, 31:3, 33: 7}, numIterations=10)
+    duration_gbt = GradientBoostedTrees.trainRegressor(train_data, {0:route_arity, 31:3, 33: 7}, numIterations=10).setLabelCol(label).setFeaturesCol("features")
 
     paramGrid = (ParamGridBuilder()
              .addGrid(duration_gbt.maxDepth, [2, 4, 6])
@@ -60,32 +67,50 @@ def train_gbt(train_data):
 
     crossval = CrossValidator(estimator=duration_gbt,
                         estimatorParamMaps=paramGrid,
-                        evaluator=RegressionEvaluator(labelCol="duration"),
+                        evaluator=RegressionEvaluator(labelCol=label),
                         numFolds=5)
 
     cvModel = crossval.fit(train_data)
+
+    save_train_info(cvModel.bestModel, test_data, "gbt", file_to_save)
+
     return cvModel;
 
 # exemplo de chamada: save_train_info(cvModel, "Lasso", <nome do arquivo para salvar os resultados>)
-def save_train_info(model, model_name, filepath):
-    output = model_name + "\n"
-    with open(filepath, 'a') as outfile:
-        output += "Model:\n"
-        output += "Coefficients: %s\n" % str(model.coefficients)
-        output += "Intercept: %s\n" % str(model.intercept)
-        output += "Model info\n"
+def save_test_info(model, test_data, model_name, filepath):
 
-        trainingSummary = RegressionMetrics(predictions_and_labels)
+    trainingSummary = RegressionMetrics(getPredictionsLabels(model, test_data))
 
-        output += "RMSE: %f\n" % trainingSummary.rootMeanSquaredError
-        output += "MAE: %f\n" % trainingSummary.meanAbsoluteError
-        output += "r2: %f\n" % trainingSummary.r2
+    # output = model_name + "\n"
+    # with open(filepath + model_name, 'a') as outfile:
+    #     output += "Model:\n"
+    #     output += "Coefficients: %s\n" % str(model.coefficients)
+    #     output += "Intercept: %s\n" % str(model.intercept)
+    #     output += "Model info\n"
+    #
+    #     output += "RMSE: %f\n" % trainingSummary.rootMeanSquaredError
+    #     output += "MAE: %f\n" % trainingSummary.meanAbsoluteError
+    #     output += "r2: %f\n" % trainingSummary.r2
+    #
+    #     outfile.write(output)
 
-        outfile.write(output)
+    result = sqlContext.createDataFrame([
+        "Model:",
+        "Coefficients: %s" % str(model.coefficients),
+        "Intercept: %s" % str(model.intercept),
+        "Model info",
+        "RMSE: %f" % trainingSummary.rootMeanSquaredError,
+        "MAE: %f" % trainingSummary.meanAbsoluteError,
+        "r2: %f" % trainingSummary.r2
+        ], StringType())
+
+    result.write.text(filepath + model_name)
+
 
 def getPredictionsLabels(model, test_data):
     predictions = model.transform(test_data)
     return predictions.rdd.map(lambda row: (row.prediction, row.duration))
+
 
 def build_features_pipeline(string_columns = ["periodOrig", "weekDay", "route"],
                             features=["shapeLatOrig", "shapeLonOrig", "busStopIdOrig",
@@ -107,6 +132,19 @@ def build_features_pipeline(string_columns = ["periodOrig", "weekDay", "route"],
 
     return pipeline
 
+def is_train_or_test(month, dayOfMonth, train_start_date, train_end_date, test_end_date):
+    if month >=  train_start_date.month & dayOfMonth >= train_start_date.day & month <= train_end_date.month & dayOfMonth <= train_end_date.day:
+        return "train"
+    elif month > train_end_date.month & dayOfMonth > train_end_date.day & month <= test_end_date.month & dayOfMonth <= test_end_date.day:
+        return "test"
+    else:
+        return None
+
+def split_partitions(df, train_start_date, train_end_date, test_end_date):
+    udf_is_train_or_test = udf(is_train_or_test, StringType())
+    df = df.withColumn("partition", udf_is_train_or_test("month", "dayOfMonth", train_start_date, train_end_date, test_end_date))
+    return df
+
 def read_data(datapath, string_columns = ["periodOrig", "weekDay", "route"],
                             features=["shapeLatOrig", "shapeLonOrig", "busStopIdOrig",
                              "busStopIdDest", "shapeLatDest", "shapeLonDest", "hourOrig",
@@ -124,32 +162,47 @@ def read_data(datapath, string_columns = ["periodOrig", "weekDay", "route"],
     return training
 
 if __name__ == "__main__":
-    # if len(sys.argv) < 3:
-    #     print "Error: Wrong parameter specification!"
-    #     print "Your command should be something like:"
-    #     print "spark-submit --packages com.databricks:spark-csv_2.10:1.5.0 %s <training-data-path> <train-start-date> <train-end-date> <test-end-date> <duration-model-path>" % (sys.argv[0])
-    #     sys.exit(1)
+    if len(sys.argv) < 6:
+        print "Error: Wrong parameter specification!"
+        print "Your command should be something like:"
+        print "spark-submit --packages com.databricks:spark-csv_2.10:1.5.0 %s <training-data-path> <train-start-date(YYYY-MM-DD)> " \
+              "<train-end-date(YYYY-MM-DD)> <test-end-date(YYYY-MM-DD)> <duration-model-path>" % (sys.argv[0])
+        sys.exit(1)
 
     training_data_path = sys.argv[1]
-    # train_start_date = sys.argv[2]
-    # train_end_date = sys.argv[3]
-    # test_end_date = sys.argv[4]
-    # filepath = sys.argv[5]
+    train_start_date = sys.argv[2]
+    train_end_date = sys.argv[3]
+    test_end_date = sys.argv[4]
+    filepath = sys.argv[5]
 
     sc = SparkContext(appName="train_btr_2.0")
+    global sqlContext
     sqlContext = pyspark.SQLContext(sc)
 
     raw_data = read_data(training_data_path)
 
     pipeline = build_features_pipeline()
 
-    train_data = pipeline.fit(raw_data).transform(raw_data)
+    transformed_data = pipeline.fit(raw_data).transform(raw_data)
 
-    bestModel = train_lasso(train_data).bestModel
+    train_data = transformed_data.filter("date > '" + train_start_date + "' and date < '" + train_end_date + "'")
 
-    print bestModel.coefficients
+    test_data = transformed_data.filter("date > '" + train_end_date + "' and date < '" + test_end_date + "'")
 
-    # A partir daqui deve-se rodar os modelos e salvar os resultados separadamente
-    # model = train_lasso(train_data)
-    #
-    # model.bestModel.write().overwrite().save(filepath)
+
+    #train_data = split_partitions(train_data, train_start_date, train_end_date, test_end_date)
+
+    duration = "duration"
+    crowdedness = "probableNumPassengers"
+
+    # Lasso
+    duration_lasso_model = train_lasso(train_data, test_data, duration, filepath)
+    pass_lasso_model = train_lasso(train_data, test_data, crowdedness, filepath)
+
+    # Random Forest
+    duration_rf_model = train_rf(train_data, test_data, duration, filepath)
+    pass_rf_model = train_rf(train_data, test_data, crowdedness, filepath)
+
+    # Gradient Boosted Trees
+    duration_gbt_model = train_gbt(train_data, test_data, duration, filepath)
+    pass_gbt_model = train_gbt(train_data, test_data, crowdedness, filepath)
