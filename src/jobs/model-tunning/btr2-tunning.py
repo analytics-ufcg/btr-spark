@@ -6,7 +6,7 @@ from pyspark.ml.feature import StringIndexer
 from pyspark.sql.types import StringType
 
 # MLlib
-from pyspark.ml.regression import LinearRegressionModel, LinearRegression
+from pyspark.ml.regression import LinearRegressionModel, LinearRegression, RandomForestRegressor, GBTRegressor
 from pyspark.ml.tuning import CrossValidator, ParamGridBuilder
 from pyspark.ml.evaluation import RegressionEvaluator
 from pyspark.mllib.evaluation import RegressionMetrics
@@ -36,7 +36,9 @@ def train_lasso(train_data, test_data, label, file_to_save):
 def train_rf(train_data, test_data, label, file_to_save):
     route_arity = train_data.select('route').distinct().count()
 
-    duration_rf = RandomForest.trainRegressor(train_data, {0:route_arity, 31:3, 33: 7}, 5).setLabelCol(label).setFeaturesCol("features")
+    duration_rf = RandomForestRegressor(labelCol=label, featuresCol="features")
+
+    #RandomForest.trainRegressor(train_data, {0:route_arity, 31:3, 33: 7}, 5).setLabelCol(label).setFeaturesCol("features")
 
     paramGrid = (ParamGridBuilder()
              .addGrid(duration_rf.maxDepth, [2, 4, 6])
@@ -51,14 +53,16 @@ def train_rf(train_data, test_data, label, file_to_save):
 
     cvModel = crossval.fit(train_data)
 
-    save_train_info(cvModel.bestModel, test_data, "random-forest", file_to_save)
+    save_test_info(cvModel.bestModel, test_data, label + "-random-forest", file_to_save)
 
     return cvModel;
 
 def train_gbt(train_data, test_data, label, file_to_save):
     route_arity = train_data.select('route').distinct().count()
 
-    duration_gbt = GradientBoostedTrees.trainRegressor(train_data, {0:route_arity, 31:3, 33: 7}, numIterations=10).setLabelCol(label).setFeaturesCol("features")
+    duration_gbt = GBTRegressor(labelCol=label, featuresCol="features")
+
+    #GradientBoostedTrees.trainRegressor(train_data, {0:route_arity, 31:3, 33: 7}, numIterations=10).setLabelCol(label).setFeaturesCol("features")
 
     paramGrid = (ParamGridBuilder()
              .addGrid(duration_gbt.maxDepth, [2, 4, 6])
@@ -68,11 +72,11 @@ def train_gbt(train_data, test_data, label, file_to_save):
     crossval = CrossValidator(estimator=duration_gbt,
                         estimatorParamMaps=paramGrid,
                         evaluator=RegressionEvaluator(labelCol=label),
-                        numFolds=5)
+                        numFolds=2)
 
     cvModel = crossval.fit(train_data)
 
-    save_train_info(cvModel.bestModel, test_data, "gbt", file_to_save)
+    save_test_info(cvModel.bestModel, test_data, label + "-gbt", file_to_save)
 
     return cvModel;
 
@@ -96,8 +100,8 @@ def save_test_info(model, test_data, model_name, filepath):
 
     result = sqlContext.createDataFrame([
         "Model:",
-        "Coefficients: %s" % str(model.coefficients),
-        "Intercept: %s" % str(model.intercept),
+        #"Coefficients: %s" % str(model.coefficients),
+        #"Intercept: %s" % str(model.intercept),
         "Model info",
         "RMSE: %f" % trainingSummary.rootMeanSquaredError,
         "MAE: %f" % trainingSummary.meanAbsoluteError,
@@ -112,7 +116,7 @@ def getPredictionsLabels(model, test_data):
     return predictions.rdd.map(lambda row: (row.prediction, row.duration))
 
 
-def build_features_pipeline(string_columns = ["periodOrig", "weekDay", "route"],
+def build_features_pipeline(string_columns = ["periodOrig", "weekDay"],#, "route"],
                             features=["shapeLatOrig", "shapeLonOrig", "busStopIdOrig",
                              "busStopIdDest", "shapeLatDest", "shapeLonDest", "hourOrig",
                              "isRushOrig", "weekOfYear", "dayOfMonth", "month", "isHoliday", "isWeekend", "isRegularDay", "distance"]):
