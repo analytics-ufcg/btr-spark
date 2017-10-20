@@ -134,6 +134,26 @@ bus.data.filt <- busData %>%
 busData <- NULL
 ```
 
+Agora iremos verificar a distribuição da quantidade de passageiros que subiram em um ônibus em uma parada, fornercida pelo BULMA.
+```{r, warning=FALSE, message=FALSE}
+
+ggplot(bus.data.filt, aes(numPassengers)) + 
+  geom_histogram(bins = 100)
+
+```
+
+```{r , warning=FALSE, message=FALSE}
+bus.data.filt2 <- bus.data.filt %>%
+  filter(numPassengers<100)
+
+ggplot(bus.data.filt2, aes(numPassengers)) + 
+  geom_histogram(bins = 100)
+
+```
+
+Vemos que existem muitas rotas em que a quantidade de passageiros que subiram no ônibus em determinada parada é próxima de zero.
+
+
 ## Hora do dia
 Agora vamos plotar um gráfico de lotação de viagens entre paradas por horas do dia.
 ```{r, warning=FALSE, message=FALSE}
