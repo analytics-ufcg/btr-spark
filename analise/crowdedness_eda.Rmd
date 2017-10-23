@@ -12,13 +12,19 @@ library(ggmap)
 Importando os dados:
 
 ```{r, warning=FALSE, message=FALSE}
+
+# Otimização do código
+# 1. Utilizar data.table() ao invés de data.frame() pois consome menos memória
+# 2. Remover vairáveis e memória de descarga o quanto antes. (utilizando rm() e gc())
+# 
+
 path = "/local/orion/bigsea/btr_2.0/training_data2/"
 
 filenames <- list.files(path, pattern = "*.csv", full.names=TRUE)
 list_of_dataframes <- lapply(filenames, read.csv)
-filenames <- NULL
+rm(filenames)
 busData <- rbind.fill(list_of_dataframes)
-list_of_dataframes <- NULL
+rm(list_of_dataframes)
 ```
 
 ```{r, warning=FALSE, message=FALSE}
@@ -92,7 +98,7 @@ gp.bus.data <- busData %>% distinct(route, busStopIdOrig) %>% group_by(route) %>
 summary(gp.bus.data)
 ggplot(gp.bus.data, aes("num.stops", num.stops)) + geom_boxplot()
 
-gp.bus.data <- NULL
+rm(gp.bus.data)
 ```
 
 Vemos que a mediana é de 66 paradas, o primeiro quartil sendo 43 e o terceiro sendo 98.75 paradas.
@@ -124,6 +130,8 @@ gp.bus.crowdedness.positive.passengers <- gp.bus.crowdedness %>%
 
   ggplot(gp.bus.crowdedness.positive.passengers, aes(x = "num.passengers", max.entered.passengers)) +
     geom_boxplot()
+
+rm(gp.bus.crowdedness)
 ```
 
 Apesar de uma pequena diferença, vamos prosseguir na filtragem:
@@ -131,7 +139,9 @@ Apesar de uma pequena diferença, vamos prosseguir na filtragem:
 ```{r}
 bus.data.filt <- busData %>%
   filter(route %in% gp.bus.crowdedness.positive.passengers$route)
-busData <- NULL
+
+rm(gp.bus.crowdedness.positive.passengers)
+rm(busData)
 ```
 
 Agora iremos verificar a distribuição da quantidade de passageiros que subiram em um ônibus em uma parada, fornercida pelo BULMA.
@@ -149,6 +159,8 @@ bus.data.filt2 <- bus.data.filt %>%
 ggplot(bus.data.filt2, aes(numPassengers)) + 
   geom_histogram(bins = 100)
 
+rm(bus.data.filt2)
+
 ```
 
 Vemos que existem muitas rotas em que a quantidade de passageiros que subiram no ônibus em determinada parada é próxima de zero.
@@ -157,9 +169,8 @@ Vemos que existem muitas rotas em que a quantidade de passageiros que subiram no
 ## Hora do dia
 Agora vamos plotar um gráfico de lotação de viagens entre paradas por horas do dia.
 ```{r, warning=FALSE, message=FALSE}
-p <- ggplot(bus.data.filt, aes(x = as.factor(hourOrig), y = probableNumPassengers, colour = problem))
-p + geom_jitter(aes(alpha = 0.5))
-p <- NULL
+ggplot(bus.data.filt, aes(x = as.factor(hourOrig), y = probableNumPassengers, colour = problem)) +
+  geom_jitter(aes(alpha = 0.5))
 ```
 
 Podemos perceber que muitas viagens têm lotação baixa, mas também existem uma grande quantidade de quantidade de passageiros com valores consideráveis e outros que parecem ser outliers.
@@ -192,7 +203,7 @@ summarised.dates <- bus.data.filt %>% group_by(date) %>%
 
 temp1 <- bus.data.filt %>% select(date, hourOrig, hourDest, probableNumPassengers)
 temp1 <- left_join(temp1, summarised.dates, by = "date")
-summarised.dates <- NULL
+rm(summarised.dates)
 
 temp1 <- temp1 %>% mutate(
   diffFromMedian = probableNumPassengers - medianCrowdedness
@@ -202,14 +213,14 @@ temp2 <- temp1 %>% group_by(hourOrig) %>%
   summarise(
    medianOfDiffs = median(diffFromMedian)
 )
-temp1 <- NULL
+rm(temp1)
 
 ggplot(temp2, aes(as.factor(hourOrig), medianOfDiffs)) +
   geom_bar(stat = "identity", fill = "#2f4c56", legend = FALSE) + 
   scale_y_continuous("Média das diferenças (em quantidade de passageiros)") +
   theme(axis.title.x = element_blank()) +
   labs(title = "Mediana das diferenças entre número de passageiros de viagens e a quantidade de passageiros mediana do dia")
-temp2 <- NULL
+rm(temp2)
 ```
 
 Vemos que existe um pico logo no início da manhã sobre a quantidade de passageiros, o qual tem um retorno perto do meio dia e final da tarde.
@@ -236,7 +247,7 @@ summarised.weeks <- bus.data.filt %>% group_by(weekOfYear) %>%
 
 temp3 <- bus.data.filt %>% select(weekOfYear, weekDay, probableNumPassengers)
 temp3 <- left_join(temp3, summarised.weeks, by = "weekOfYear")
-summarised.weeks <- NULL
+rm(summarised.weeks)
 
 temp3 <- temp3 %>% mutate(
   diffFromMedian = probableNumPassengers - medianWeek
@@ -246,7 +257,7 @@ temp4 <- temp3 %>% group_by(weekDay) %>%
   summarise(
    medianOfDiffs = median(diffFromMedian)
 )
-temp3 <- NULL
+rm(temp3)
 
 temp4 %>% 
   mutate(weekDay = factor(weekDay, levels = c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"))) %>% 
@@ -256,7 +267,7 @@ temp4 %>%
     scale_y_continuous("Média das diferenças (em número de passageiros)") +
     theme(axis.title.x = element_blank()) +
     labs(title = "Quanto (em média) a mediana da quantidade de passageiros de cada dia da \nsemana diferencia da mediana das quantidades de passageiros da semana")
-temp4 <- NULL
+rm(temp4)
 ```
 
 Vemos que a segunda feira é o dia que mais se diferencia, tendo a menor quantidade de passageiros da semana.
@@ -266,7 +277,7 @@ Vemos que a segunda feira é o dia que mais se diferencia, tendo a menor quantid
 m <- get_map("Curitiba",zoom=11,maptype="toner",source="stamen")
 
 g <- ggmap(m)
-m <- NULL
+rm(m)
 ```
 
 Vamos fazer um grid com a latitude entre -25.67 e -25.33 e longitude entre -49.40 e -49.07.
@@ -331,15 +342,17 @@ hour.median.num.passengers <- bus.data.filt %>%
 
 joined.grid <- left_join(bus.data.grid, hour.median.num.passengers, by = "hourOrig") %>% 
   mutate(diff.num.passengers = probableNumPassengers - median.num.passengers)
-hour.median.num.passengers <- NULL
-bus.data.grid <- NULL
+
+rm(hour.median.num.passengers)
+rm(bus.data.grid)
 
 hourly.summarised.joined.grid <- joined.grid %>% 
   group_by(plotting.lat, plotting.lon) %>% 
   summarise(
     median.diff.num.passengers = median(diff.num.passengers)
   )
-joined.grid <- NULL
+
+rm(joined.grid)
 
 min.median.diff.num.passengers <- min(hourly.summarised.joined.grid$median.diff.num.passengers)
 
@@ -397,8 +410,8 @@ d2 <- bus.data.filt %>%
     )
 cor(d2$lg.duration, d2$lg.probableNumPassengers)
 
-d2 <- NULL
-bus.data.filt <- NULL
+rm(d2)
+rm(bus.data.filt)
 ```
 
 Vemos que não existe correlação significativa entre a duração e a quantidade de passageiros.
