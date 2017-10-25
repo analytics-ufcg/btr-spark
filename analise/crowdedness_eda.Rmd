@@ -4,6 +4,7 @@ output: html_document
 ---
 
 ```{r, warning=FALSE, message=FALSE}
+init.time <- Sys.time()
 library(plyr)
 library(tidyverse)
 library(ggmap)
@@ -12,13 +13,7 @@ library(ggmap)
 Importando os dados:
 
 ```{r, warning=FALSE, message=FALSE}
-
-# Otimização do código
-# 1. Utilizar data.table() ao invés de data.frame() pois consome menos memória
-# 2. Remover vairáveis e memória de descarga o quanto antes. (utilizando rm() e gc())
-# 
-
-path = "/local/orion/bigsea/btr_2.0/training_data2/"
+path = "/local/luiz/bigsea/pre-processed-data/training_data_1_month"
 
 filenames <- list.files(path, pattern = "*.csv", full.names=TRUE)
 list_of_dataframes <- lapply(filenames, read.csv)
@@ -28,6 +23,7 @@ rm(list_of_dataframes)
 ```
 
 ```{r, warning=FALSE, message=FALSE}
+busData <- busData %>% select(route, busStopIdOrig, numPassengers, probableNumPassengers, hourOrig, date, hourDest, weekDay, weekOfYear, shapeLatOrig, shapeLonOrig, duration, problem)
 str(busData)
 ```
 
@@ -90,7 +86,7 @@ analises que queremos:
 2) Relação entre o dia da semana e a lotação de uma viagem entre duas paradas
 3) Relação entre a área da cidade e a lotação de uma viagem entre duas paradas
 
-Vejamos primeiramente qual a quantidade de paradas que cara rota tem:
+Vejamos primeiramente qual a quantidade de paradas que cada rota tem:
 
 ```{r, warning=FALSE, message=FALSE}
 gp.bus.data <- busData %>% distinct(route, busStopIdOrig) %>% group_by(route) %>% summarise(num.stops = n())
@@ -99,6 +95,7 @@ summary(gp.bus.data)
 ggplot(gp.bus.data, aes("num.stops", num.stops)) + geom_boxplot()
 
 rm(gp.bus.data)
+gc()
 ```
 
 Vemos que a mediana é de 66 paradas, o primeiro quartil sendo 43 e o terceiro sendo 98.75 paradas.
@@ -132,6 +129,7 @@ gp.bus.crowdedness.positive.passengers <- gp.bus.crowdedness %>%
     geom_boxplot()
 
 rm(gp.bus.crowdedness)
+gc()
 ```
 
 Apesar de uma pequena diferença, vamos prosseguir na filtragem:
@@ -142,6 +140,7 @@ bus.data.filt <- busData %>%
 
 rm(gp.bus.crowdedness.positive.passengers)
 rm(busData)
+gc()
 ```
 
 Agora iremos verificar a distribuição da quantidade de passageiros que subiram em um ônibus em uma parada, fornercida pelo BULMA.
@@ -160,7 +159,7 @@ ggplot(bus.data.filt2, aes(numPassengers)) +
   geom_histogram(bins = 100)
 
 rm(bus.data.filt2)
-
+gc()
 ```
 
 Vemos que existem muitas rotas em que a quantidade de passageiros que subiram no ônibus em determinada parada é próxima de zero.
@@ -221,6 +220,7 @@ ggplot(temp2, aes(as.factor(hourOrig), medianOfDiffs)) +
   theme(axis.title.x = element_blank()) +
   labs(title = "Mediana das diferenças entre número de passageiros de viagens e a quantidade de passageiros mediana do dia")
 rm(temp2)
+gc()
 ```
 
 Vemos que existe um pico logo no início da manhã sobre a quantidade de passageiros, o qual tem um retorno perto do meio dia e final da tarde.
@@ -268,6 +268,7 @@ temp4 %>%
     theme(axis.title.x = element_blank()) +
     labs(title = "Quanto (em média) a mediana da quantidade de passageiros de cada dia da \nsemana diferencia da mediana das quantidades de passageiros da semana")
 rm(temp4)
+gc()
 ```
 
 Vemos que a segunda feira é o dia que mais se diferencia, tendo a menor quantidade de passageiros da semana.
@@ -278,6 +279,7 @@ m <- get_map("Curitiba",zoom=11,maptype="toner",source="stamen")
 
 g <- ggmap(m)
 rm(m)
+gc()
 ```
 
 Vamos fazer um grid com a latitude entre -25.67 e -25.33 e longitude entre -49.40 e -49.07.
@@ -364,6 +366,7 @@ hourly.summarised.joined.grid <- hourly.summarised.joined.grid %>%
 g +
   geom_tile(aes(x = plotting.lon, y = plotting.lat, fill = positive.median.diff.num.passengers), data = hourly.summarised.joined.grid, alpha = 0.5) + 
   viridis::scale_fill_viridis(direction = -1)
+gc()
 ```
 
 Podemos verificar que as periferias tem um número maior de passageiros e os mesmos corredores mencionados anteriormente tem duração inferior as demais regiões.
@@ -412,6 +415,15 @@ cor(d2$lg.duration, d2$lg.probableNumPassengers)
 
 rm(d2)
 rm(bus.data.filt)
+gc()
+
 ```
 
 Vemos que não existe correlação significativa entre a duração e a quantidade de passageiros.
+
+```{r}
+final.time <- Sys.time()
+running.time <- as.character(final.time - init.time)
+write.csv(running.time, "runningtime.csv", row.names = F)
+```
+
