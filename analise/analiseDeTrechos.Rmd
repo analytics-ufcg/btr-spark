@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r, warning=F, message=F}
+library(plyr)
 library(readr)
 library(ggplot2)
 library(tidyverse)
@@ -19,12 +20,21 @@ library(resample)
 Primeiramente importaremos os dados:
 
 ```{r, warning=F, message=F}
-dados.bulma <- read_csv("dadostratados.csv")
+path = "/local/luiz/bigsea/pre-processed-data/training_data_1_month"
+
+filenames <- list.files(path, pattern = "*.csv", full.names=TRUE)
+list_of_dataframes <- lapply(filenames, read.csv)
+rm(filenames)
+busData <- rbind.fill(list_of_dataframes)
+rm(list_of_dataframes)
 ```
 
 Vamos ver como se comportam as durações durante o dia:
 
 ```{r, warning=F, message=F}
+dados.bulma <- busData %>% select(route, busStopIdOrig, hourOrig, date, hourDest, weekDay, weekOfYear, shapeLatOrig, shapeLonOrig, duration, problem)
+rm(busData)
+
 dados.bulma %>% 
   ggplot(aes(x = as.factor(hourOrig), y = duration)) +
   geom_boxplot()
@@ -41,7 +51,7 @@ summarised.dates <- dados.bulma %>% group_by(date) %>%
 
 temp1 <- dados.bulma %>% select(date, hourOrig, hourDest, duration)
 temp1 <- left_join(temp1, summarised.dates, by = "date")
-summarised.dates <- NULL
+rm(summarised.dates)
 
 # Diferença entre cada duração e a duração mediana do dia
 temp1 <- temp1 %>% mutate(
@@ -53,7 +63,7 @@ temp2 <- temp1 %>% group_by(hourOrig) %>%
   summarise(
    medianOfDiffs = median(diffFromMedian)
 )
-temp1 <- NULL
+rm(temp1)
 
 # plot
 ggplot(temp2, aes(as.factor(hourOrig), medianOfDiffs)) +
@@ -61,7 +71,8 @@ ggplot(temp2, aes(as.factor(hourOrig), medianOfDiffs)) +
   scale_y_continuous("Média das diferenças (em segundos)") +
   theme(axis.title.x = element_blank()) +
   labs(title = "Mediana das diferenças entre as durações de viagens e a duração mediana do dia")
-temp2 <- NULL
+rm(temp2)
+gc()
 ```
 
 Podemos perceber que parece existir três horários de pico locais, das 7 às 8 horas, 12 às 13 e das 16 às 18 horas.
@@ -117,7 +128,7 @@ summarised.weeks <- dados.bulma %>% group_by(weekOfYear) %>%
 
 temp3 <- dados.bulma %>% select(weekOfYear, weekDay, duration)
 temp3 <- left_join(temp3, summarised.weeks, by = "weekOfYear")
-summarised.weeks <- NULL
+rm(summarised.weeks)
 
 # Diferença entre cada duração e a duração mediana da semana
 temp3 <- temp3 %>% mutate(
@@ -129,7 +140,7 @@ temp4 <- temp3 %>% group_by(weekDay) %>%
   summarise(
    medianOfDiffs = median(diffFromMedian)
 )
-temp3 <- NULL
+rm(temp3)
 
 temp4 %>% 
   mutate(weekDay = factor(weekDay, levels = c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"))) %>% 
@@ -139,7 +150,8 @@ temp4 %>%
     scale_y_continuous("Média das diferenças (em segundos)") +
     theme(axis.title.x = element_blank()) +
     labs(title = "Quanto (em média) a mediana das durações de cada dia da semana difere \nda mediana das durações da semana")
-temp4 <- NULL
+rm(temp4)
+gc()
 ```
 
 Podemos ver que, a terça, quarta e quinta tem uma duração maior que as durações dos demais dias, com exceção do sábado.
@@ -152,7 +164,7 @@ library(ggmap)
 m <- get_map("Curitiba",zoom=11,maptype="toner",source="stamen")
 
 g <- ggmap(m)
-m <- NULL
+rm(m)
 # g +
 #   stat_density2d(aes(x = shapeLonOrig, y = shapeLatOrig, fill=duration, colour = duration), data=dados.bulma,geom="polygon", alpha=0.2, contour = T) +
 #   scale_fill_gradient(low = "yellow", high = "red")
@@ -193,6 +205,7 @@ dados.bulma.grid %>%
   ggplot(aes(lat.grid.index, lon.grid.index)) +
     geom_tile(aes(fill = median.duration), colour = "white") +
     viridis::scale_fill_viridis(direction = -1)
+gc()
 ```
 
 Vemos que existem locais em que as viagens estão com duração mais alta, mas talvez seja influenciado por algum outlier.
@@ -228,7 +241,8 @@ summarised.grid <- dados.bulma.grid %>%
 g +
   geom_tile(aes(x = plotting.lon, y = plotting.lat, fill = sqrt(median.duration)), data = summarised.grid, alpha = 0.5) + 
   viridis::scale_fill_viridis(direction = -1)
-summarised.grid <- NULL
+rm(summarised.grid)
+gc()
 ```
 
 Podemos ver que realmente existem trechos da cidade que tem a duração maior.
@@ -241,19 +255,19 @@ hour.median.duration <- dados.bulma %>%
   summarise(
     median.duration = median(duration)
   )
-dados.bulma <- NULL
+rm(dados.bulma)
 
 joined.grid <- left_join(dados.bulma.grid, hour.median.duration, by = "hourOrig") %>% 
   mutate(diff.duration = duration - median.duration)
-hour.median.duration <- NULL
-dados.bulma.grid <- NULL
+rm(hour.median.duration)
+rm(dados.bulma.grid)
 
 hourly.summarised.joined.grid <- joined.grid %>% 
   group_by(plotting.lat, plotting.lon) %>% 
   summarise(
     median.diff.duration = median(diff.duration)
   )
-joined.grid <- NULL
+rm(joined.grid)
 
 min.median.diff.duration <- min(hourly.summarised.joined.grid$median.diff.duration)
 
