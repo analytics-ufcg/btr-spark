@@ -8,3 +8,7 @@ src/java/best-trip-recommender/.classpath
 src/java/best-trip-recommender/.gitignore
 src/java/best-trip-recommender/.settings/
 .idea/
+analise/.Rproj.user
+analise/.Rhistory
+analise/dadostratados.csv
+.Rproj.user

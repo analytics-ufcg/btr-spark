@@ -216,6 +216,7 @@ def extract_routes_stops(df, routes_stops_output_path):
     unique_stops_df.write.format("com.databricks.spark.csv") \
         .save(routes_stops_output_path, mode="overwrite", header=True)
 
+<<<<<<< HEAD
 def get_normal_distribution_list(mu, sigma, l_size):
     dist = list()
     for i in range(l_size):
@@ -230,6 +231,30 @@ def get_normal_distribution_list(mu, sigma, l_size):
         else:
             norm_dist_sorted[-1 * (i + 1) / 2] = norm_dist[i]
     return norm_dist_sorted
+=======
+def calculate_velocity(distance, duration):
+    if (duration == 0):
+        return sys.maxint
+    return (distance / duration) * 3.6
+
+def clean_data(df):
+    # Filter the legs which destination is not the first stop of a shape
+    df = df.filter(df.distanceTraveledShapeDest > 0)
+    # Filter the legs whose origin and destination belong has the same tripNum
+    df = df.filter(df.tripNumOrig == df.tripNumDest)
+    # Filter the legs that do not have the origin and destination as the same stopId
+    df = df.filter(df.busStopIdOrig != df.busStopIdDest)
+    # Create a column velocityKmh
+    udf_caculate_velocity = udf(calculate_velocity, DoubleType())
+    df = df.withColumn("velocityKmh", udf_caculate_velocity("distance", "duration"))
+    # Filter unreal (too fast) velocities
+    df = df.filter(df.velocityKmh <= 90)
+    # Filter the legs which did not have any problem during the trip or in the GPS measurement
+    df = df.filter('problem = "NO_PROBLEM" or problem = "BETWEEN"')
+    # Filter durations under 1100 which represents a very small piece of data
+    df = df.filter(df.duration <= 1100)
+    return df
+>>>>>>> bus-legs-analysis
 
 if __name__ == "__main__":
     if len(sys.argv) < 6:
@@ -296,6 +321,8 @@ if __name__ == "__main__":
     print stops_df_lead.show(10)
 
     stops_df_lead = extract_features(stops_df_lead)
+
+    stops_df_lead = clean_data(stops_df_lead)
 
     stops_df_lead.write.format("com.databricks.spark.csv")\
         .save(btr_pre_processing_output_path, mode="overwrite", header = True)

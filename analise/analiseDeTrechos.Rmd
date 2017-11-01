@@ -1,0 +1,284 @@
+---
+title: "Analise de pernas de ônibus"
+author: "Luiz Alberto Fonseca"
+date: "September 5, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, warning=F, message=F}
+library(plyr)
+library(readr)
+library(ggplot2)
+library(tidyverse)
+library(resample)
+```
+
+Primeiramente importaremos os dados:
+
+```{r, warning=F, message=F}
+path = "/local/luiz/bigsea/pre-processed-data/training_data_1_month"
+
+filenames <- list.files(path, pattern = "*.csv", full.names=TRUE)
+list_of_dataframes <- lapply(filenames, read.csv)
+rm(filenames)
+busData <- rbind.fill(list_of_dataframes)
+rm(list_of_dataframes)
+```
+
+Vamos ver como se comportam as durações durante o dia:
+
+```{r, warning=F, message=F}
+dados.bulma <- busData %>% select(route, busStopIdOrig, hourOrig, date, hourDest, weekDay, weekOfYear, shapeLatOrig, shapeLonOrig, duration, problem)
+rm(busData)
+
+dados.bulma %>% 
+  ggplot(aes(x = as.factor(hourOrig), y = duration)) +
+  geom_boxplot()
+```
+
+Vemos que apenas os horários abaixo das 7 horas e acima das 18 horas parecem ser menores que os demais.
+
+Vamos comparar a hora com as demais horas do dia, ou seja, para cada dia, como se comporta aquela hora em comparação com as demais:
+
+```{r, warning=F, message=F}
+summarised.dates <- dados.bulma %>% group_by(date) %>%
+  summarise(meanDuration = mean(duration, na.rm = T),
+            medianDuration = median(duration, na.rm = T))
+
+temp1 <- dados.bulma %>% select(date, hourOrig, hourDest, duration)
+temp1 <- left_join(temp1, summarised.dates, by = "date")
+rm(summarised.dates)
+
+# Diferença entre cada duração e a duração mediana do dia
+temp1 <- temp1 %>% mutate(
+  diffFromMedian = duration - medianDuration
+)
+
+# Mediana das diferenças por hora
+temp2 <- temp1 %>% group_by(hourOrig) %>%
+  summarise(
+   medianOfDiffs = median(diffFromMedian)
+)
+rm(temp1)
+
+# plot
+ggplot(temp2, aes(as.factor(hourOrig), medianOfDiffs)) +
+  geom_bar(stat = "identity", fill = "#2f4c56", legend = FALSE) + 
+  scale_y_continuous("Média das diferenças (em segundos)") +
+  theme(axis.title.x = element_blank()) +
+  labs(title = "Mediana das diferenças entre as durações de viagens e a duração mediana do dia")
+rm(temp2)
+gc()
+```
+
+Podemos perceber que parece existir três horários de pico locais, das 7 às 8 horas, 12 às 13 e das 16 às 18 horas.
+
+```{r, warning=F, message=F}
+# Vejamos se realmente existe uma diferença significativa:
+
+# set.seed(66)
+# 
+# boot.dados.bulma.by.hour <- dados.bulma %>% 
+#   group_by(hourOrig) %>% 
+#   summarise(
+#     y.025 = CI.bca(bootstrap(data = duration, statistic = mean, seed = 66, R = 100), probs = c(.025, .975))[1],
+#     y.975 = CI.bca(bootstrap(data = duration, statistic = mean, seed = 66, R = 100), probs = c(.025, .975))[2]
+#   )
+# 
+# boot.dados.bulma.by.hour %>% 
+#   ggplot(aes(x = hourOrig, ymin = y.025, ymax = y.975)) +
+#   geom_errorbar()
+# boot.dados.bulma.by.hour <- NULL
+
+# Podemos ver que os horários de pico determinados anteriormente, entre 7 e 8 horas tem viagens com duração maior que as anteriores e maiores que as viagens após as 19 horas, mas não se pode concluir nada sobre as demais. Definitivamente 18 horas é um horário de pico, visto que é maior que as demais.
+```
+
+## Dia da semana
+
+```{r, warning=F, message=F}
+# Vejamos agora as durações para cada dia da semana:
+
+# boot.dados.bulma.by.weekday <- dados.bulma %>% 
+#   group_by(weekDay) %>% 
+#   summarise(
+#     y.025 = CI.bca(bootstrap(data = duration, statistic = mean, seed = 66, R = 100), probs = c(.025, .975))[1],
+#     y.975 = CI.bca(bootstrap(data = duration, statistic = mean, seed = 66, R = 100), probs = c(.025, .975))[2]
+#   )
+# 
+# boot.dados.bulma.by.weekday %>% 
+#   mutate(weekDay = factor(weekDay, levels = c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"))) %>% 
+#   arrange(weekDay) %>% 
+#   ggplot(aes(x = weekDay, ymin = y.025, ymax = y.975)) +
+#   geom_errorbar()
+# 
+# boot.dados.bulma.by.weekday <- NULL
+
+# Podemos perceber que o dia em que os ônibus mais demoram é a segunda-feira, visto que é o único que existe uma diferença significativa de duração em relação aos demais. A quinta-feira também tem uma duração mais elevada quando comparada aos demais, exceto à segunda-feira e quarta-feira.
+```
+
+Vejamos agora a diferença da duração da viagem em relação à duração mediana semanal.
+
+```{r, warning=F, message=F}
+summarised.weeks <- dados.bulma %>% group_by(weekOfYear) %>%
+  summarise(medianWeek = median(duration, na.rm = T))
+
+temp3 <- dados.bulma %>% select(weekOfYear, weekDay, duration)
+temp3 <- left_join(temp3, summarised.weeks, by = "weekOfYear")
+rm(summarised.weeks)
+
+# Diferença entre cada duração e a duração mediana da semana
+temp3 <- temp3 %>% mutate(
+  diffFromMedian = duration - medianWeek
+)
+
+# Mediana das diferenças por dia da semana
+temp4 <- temp3 %>% group_by(weekDay) %>%
+  summarise(
+   medianOfDiffs = median(diffFromMedian, na.rm = T)
+)
+rm(temp3)
+
+temp4 %>% 
+  mutate(weekDay = factor(weekDay, levels = c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"))) %>% 
+  arrange(weekDay) %>% 
+  ggplot(aes(as.factor(weekDay), medianOfDiffs)) +
+    geom_bar(stat = "identity", fill = "#2f4c56", legend = FALSE) + 
+    scale_y_continuous("Média das diferenças (em segundos)") +
+    theme(axis.title.x = element_blank()) +
+    labs(title = "Quanto (em média) a mediana das durações de cada dia da semana difere \nda mediana das durações da semana")
+rm(temp4)
+gc()
+```
+
+Podemos ver que, a terça, quarta e quinta tem uma duração maior que as durações dos demais dias, com exceção do sábado.
+
+## Área da cidade
+
+```{r, warning=F, message=F}
+library(ggmap)
+
+m <- get_map("Curitiba",zoom=11,maptype="toner",source="stamen")
+
+g <- ggmap(m)
+rm(m)
+# g +
+#   stat_density2d(aes(x = shapeLonOrig, y = shapeLatOrig, fill=duration, colour = duration), data=dados.bulma,geom="polygon", alpha=0.2, contour = T) +
+#   scale_fill_gradient(low = "yellow", high = "red")
+
+# Vemos que o centro da cidade tem maior quantidades de viagens.
+```
+
+Vejamos as viagens e suas durações individualmente
+
+```{r, warning=F, message=F}
+g +
+  geom_point(aes(x = shapeLonOrig, y = shapeLatOrig, color = duration), data = dados.bulma) + 
+  geom_point(size=3,alpha=1)
+```
+
+Não é possível afirmar com certeza quais regiões da cidade tem maior duração.
+
+Vamos fazer um grid com a latitude entre -25.67 e -25.33 e longitude entre -49.40 e -49.07.
+
+```{r, warning=F, message=F}
+lat.min <- -25.67
+lat.max <- -25.32
+lon.min <- -49.40
+lon.max <- -49.07
+
+lat.step <- (lat.max - lat.min) / 50
+lon.step <- (lon.max - lon.min) / 50
+
+dados.bulma.grid <- dados.bulma %>% 
+  mutate(
+    lat.grid.index = floor((shapeLatOrig - lat.min) / lat.step),
+    lon.grid.index = floor((shapeLonOrig - lon.min) / lon.step)
+  )
+
+dados.bulma.grid %>%
+  group_by(lat.grid.index, lon.grid.index) %>% 
+  summarise(median.duration = median(duration, na.rm = T)) %>% 
+  ggplot(aes(lat.grid.index, lon.grid.index)) +
+    geom_tile(aes(fill = median.duration), colour = "white") +
+    viridis::scale_fill_viridis(direction = -1)
+gc()
+```
+
+Vemos que existem locais em que as viagens estão com duração mais alta, mas talvez seja influenciado por algum outlier.
+
+Logo, vamos atenuar os valores maiores.
+
+```{r, warning=F, message=F}
+dados.bulma.grid %>% 
+  group_by(lat.grid.index, lon.grid.index) %>% 
+  summarise(median.duration = median(duration, na.rm = T)) %>% 
+  ggplot(aes(lat.grid.index, lon.grid.index)) +
+    geom_tile(aes(fill = median.duration**.5), colour = "white") +
+    viridis::scale_fill_viridis(direction = -1)
+```
+
+Parece existir uma maior concentração de durações altas em corredores da cidade.
+
+Vejamos se isso se confirma quando colocamos em um mapa:
+
+```{r, warning=F, message=F}
+dados.bulma.grid <- dados.bulma.grid %>% 
+  mutate(
+    plotting.lat = lat.min + (lat.grid.index * lat.step + (lat.grid.index + 1) * lat.step) / 2,
+    plotting.lon = lon.min + (lon.grid.index * lon.step + (lon.grid.index + 1) * lon.step) / 2
+  )
+
+summarised.grid <- dados.bulma.grid %>% 
+  group_by(plotting.lat, plotting.lon) %>% 
+  summarise(
+    median.duration = median(duration, na.rm = T)
+  )
+
+g +
+  geom_tile(aes(x = plotting.lon, y = plotting.lat, fill = sqrt(median.duration)), data = summarised.grid, alpha = 0.5) + 
+  viridis::scale_fill_viridis(direction = -1)
+rm(summarised.grid)
+gc()
+```
+
+Podemos ver que realmente existem trechos da cidade que tem a duração maior.
+
+Vejamos o quanto que esses trechos se diferenciam da mediana durante a semana:
+
+```{r, warning=F, message=F}
+hour.median.duration <- dados.bulma %>% 
+  group_by(hourOrig) %>% 
+  summarise(
+    median.duration = median(duration, na.rm = T)
+  )
+rm(dados.bulma)
+
+joined.grid <- left_join(dados.bulma.grid, hour.median.duration, by = "hourOrig") %>% 
+  mutate(diff.duration = duration - median.duration)
+rm(hour.median.duration)
+rm(dados.bulma.grid)
+
+hourly.summarised.joined.grid <- joined.grid %>% 
+  group_by(plotting.lat, plotting.lon) %>% 
+  summarise(
+    median.diff.duration = median(diff.duration, na.rm = T)
+  )
+rm(joined.grid)
+
+min.median.diff.duration <- min(hourly.summarised.joined.grid$median.diff.duration)
+
+hourly.summarised.joined.grid <- hourly.summarised.joined.grid %>% 
+  mutate(
+    positive.median.diff.duration = median.diff.duration + abs(min.median.diff.duration)
+  )
+
+g +
+  geom_tile(aes(x = plotting.lon, y = plotting.lat, fill = sqrt(positive.median.diff.duration)), data = hourly.summarised.joined.grid, alpha = 0.5) + 
+  viridis::scale_fill_viridis(direction = -1)
+```
+
+Podemos verificar que os mesmos corredores estão presentes ao plotar a diferença do horário para mediana de cada hora.
