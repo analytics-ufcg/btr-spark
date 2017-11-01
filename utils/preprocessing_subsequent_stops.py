@@ -216,7 +216,6 @@ def extract_routes_stops(df, routes_stops_output_path):
     unique_stops_df.write.format("com.databricks.spark.csv") \
         .save(routes_stops_output_path, mode="overwrite", header=True)
 
-<<<<<<< HEAD
 def get_normal_distribution_list(mu, sigma, l_size):
     dist = list()
     for i in range(l_size):
@@ -231,7 +230,7 @@ def get_normal_distribution_list(mu, sigma, l_size):
         else:
             norm_dist_sorted[-1 * (i + 1) / 2] = norm_dist[i]
     return norm_dist_sorted
-=======
+
 def calculate_velocity(distance, duration):
     if (duration == 0):
         return sys.maxint
@@ -254,7 +253,6 @@ def clean_data(df):
     # Filter durations under 1100 which represents a very small piece of data
     df = df.filter(df.duration <= 1100)
     return df
->>>>>>> bus-legs-analysis
 
 if __name__ == "__main__":
     if len(sys.argv) < 6:
