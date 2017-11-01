@@ -19,11 +19,7 @@ from datetime import datetime
 import random
 
 def read_file(filepath, sqlContext):
-    data_frame = sqlContext.read.format("com.databricks.spark.csv") \
-        .option("header", "false") \
-        .option("inferSchema", "true") \
-        .option("nullValue", "-") \
-        .load(filepath)
+    data_frame = sqlContext.read.csv(filepath, header=False, inferSchema=True, nullValue="-")
 
     while len(data_frame.columns) < 16:
         col_name = "_c" + str(len(data_frame.columns))
@@ -213,9 +209,8 @@ def extract_routes_stops(df, routes_stops_output_path):
         .distinct()\
         .orderBy("route", "shapeId", "distanceTraveledShape")
 
-    unique_stops_df.write.format("com.databricks.spark.csv") \
-        .save(routes_stops_output_path, mode="overwrite", header=True)
-
+    unique_stops_df.write.csv(routes_stops_output_path, mode="overwrite", header=True)
+    
 def get_normal_distribution_list(mu, sigma, l_size):
     dist = list()
     for i in range(l_size):
@@ -234,7 +229,7 @@ def get_normal_distribution_list(mu, sigma, l_size):
 if __name__ == "__main__":
     if len(sys.argv) < 6:
         print "Error! Your command must be something like:"
-        print "spark-submit --packages com.databricks:spark-csv_2.10:1.5.0 %s <btr-input-path> " \
+        print "spark-submit %s <btr-input-path> " \
               "<btr-pre-processing-output> <routes-stops-output-path> <initial-date(YYYY-MM-DD)> " \
               "<final-date(YYYY-MM-DD)>" % (sys.argv[0])
         sys.exit(1)
@@ -297,7 +292,8 @@ if __name__ == "__main__":
 
     stops_df_lead = extract_features(stops_df_lead)
 
-    stops_df_lead.write.format("com.databricks.spark.csv")\
-        .save(btr_pre_processing_output_path, mode="overwrite", header = True)
+    output = stops_df_lead.filter("duration < 1200 and duration > 0")
 
+    output.write.csv(btr_pre_processing_output_path, mode="overwrite", header = True)
+    
     sc.stop()

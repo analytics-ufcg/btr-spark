@@ -25,7 +25,7 @@ def train_lasso(train_data, test_data, label, file_to_save):
     crossval = CrossValidator(estimator=duration_lr,
                               estimatorParamMaps=paramGrid,
                               evaluator=RegressionEvaluator(labelCol=label),
-                              numFolds=5)
+                              numFolds=2)
 
     cvModel = crossval.fit(train_data)
 
@@ -72,7 +72,7 @@ def train_gbt(train_data, test_data, label, file_to_save):
     crossval = CrossValidator(estimator=duration_gbt,
                         estimatorParamMaps=paramGrid,
                         evaluator=RegressionEvaluator(labelCol=label),
-                        numFolds=2)
+                        numFolds=5)
 
     cvModel = crossval.fit(train_data)
 
@@ -83,7 +83,11 @@ def train_gbt(train_data, test_data, label, file_to_save):
 # exemplo de chamada: save_train_info(cvModel, "Lasso", <nome do arquivo para salvar os resultados>)
 def save_test_info(model, test_data, model_name, filepath):
 
-    trainingSummary = RegressionMetrics(getPredictionsLabels(model, test_data))
+    predictions, trainingSummary = getPredictionsLabels(model, test_data)
+
+    predictions = predictions.select("duration", "probableNumPassengers", "prediction")
+
+    print predictions.describe().show()
 
     # output = model_name + "\n"
     # with open(filepath + model_name, 'a') as outfile:
@@ -108,12 +112,19 @@ def save_test_info(model, test_data, model_name, filepath):
         "r2: %f" % trainingSummary.r2
         ], StringType())
 
-    result.write.text(filepath + model_name)
+    predictions.write.csv(filepath + "predictions/" + model_name, mode="overwrite", header = True)
+
+    model.write().overwrite().save(filepath + "model/" + model_name)
+
+    result.write.text(filepath + "info/" + model_name)
 
 
 def getPredictionsLabels(model, test_data):
     predictions = model.transform(test_data)
-    return predictions.rdd.map(lambda row: (row.prediction, row.duration))
+
+    trainingSummary = RegressionMetrics(predictions.rdd.map(lambda row: (row.prediction, row.duration)))
+
+    return (predictions, trainingSummary)
 
 
 def build_features_pipeline(string_columns = ["periodOrig", "weekDay"],#, "route"],
@@ -154,11 +165,7 @@ def read_data(datapath, string_columns = ["periodOrig", "weekDay", "route"],
                              "busStopIdDest", "shapeLatDest", "shapeLonDest", "hourOrig",
                              "isRushOrig", "weekOfYear", "dayOfMonth", "month", "isHoliday", "isWeekend", "isRegularDay", "distance"]):
 
-    training_raw = sqlContext.read.format("com.databricks.spark.csv")\
-        .option("header", "true")\
-        .option("inferSchema", "true")\
-        .option("nullValue", "-")\
-        .load(datapath)
+    training_raw = sqlContext.read.csv(datapath, header=True, inferSchema=True, nullValue="-")
 
     training = training_raw.withColumn("duration", training_raw.duration.cast('Double'))\
     	.na.drop(subset = string_columns + features)
@@ -169,7 +176,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 6:
         print "Error: Wrong parameter specification!"
         print "Your command should be something like:"
-        print "spark-submit --packages com.databricks:spark-csv_2.10:1.5.0 %s <training-data-path> <train-start-date(YYYY-MM-DD)> " \
+        print "spark-submit %s <training-data-path> <train-start-date(YYYY-MM-DD)> " \
               "<train-end-date(YYYY-MM-DD)> <test-end-date(YYYY-MM-DD)> <duration-model-path>" % (sys.argv[0])
         sys.exit(1)
 
@@ -179,7 +186,7 @@ if __name__ == "__main__":
     test_end_date = sys.argv[4]
     filepath = sys.argv[5]
 
-    sc = SparkContext(appName="train_btr_2.0")
+    sc = SparkContext(appName="tunning_btr_2.0")
     global sqlContext
     sqlContext = pyspark.SQLContext(sc)
 
