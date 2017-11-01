@@ -46,8 +46,8 @@ Vamos comparar a hora com as demais horas do dia, ou seja, para cada dia, como s
 
 ```{r, warning=F, message=F}
 summarised.dates <- dados.bulma %>% group_by(date) %>%
-  summarise(meanDuration = mean(duration),
-            medianDuration = median(duration))
+  summarise(meanDuration = mean(duration, na.rm = T),
+            medianDuration = median(duration, na.rm = T))
 
 temp1 <- dados.bulma %>% select(date, hourOrig, hourDest, duration)
 temp1 <- left_join(temp1, summarised.dates, by = "date")
@@ -124,7 +124,7 @@ Vejamos agora a diferença da duração da viagem em relação à duração medi
 
 ```{r, warning=F, message=F}
 summarised.weeks <- dados.bulma %>% group_by(weekOfYear) %>%
-  summarise(medianWeek = median(duration))
+  summarise(medianWeek = median(duration, na.rm = T))
 
 temp3 <- dados.bulma %>% select(weekOfYear, weekDay, duration)
 temp3 <- left_join(temp3, summarised.weeks, by = "weekOfYear")
@@ -138,7 +138,7 @@ temp3 <- temp3 %>% mutate(
 # Mediana das diferenças por dia da semana
 temp4 <- temp3 %>% group_by(weekDay) %>%
   summarise(
-   medianOfDiffs = median(diffFromMedian)
+   medianOfDiffs = median(diffFromMedian, na.rm = T)
 )
 rm(temp3)
 
@@ -201,7 +201,7 @@ dados.bulma.grid <- dados.bulma %>%
 
 dados.bulma.grid %>%
   group_by(lat.grid.index, lon.grid.index) %>% 
-  summarise(median.duration = median(duration)) %>% 
+  summarise(median.duration = median(duration, na.rm = T)) %>% 
   ggplot(aes(lat.grid.index, lon.grid.index)) +
     geom_tile(aes(fill = median.duration), colour = "white") +
     viridis::scale_fill_viridis(direction = -1)
@@ -215,7 +215,7 @@ Logo, vamos atenuar os valores maiores.
 ```{r, warning=F, message=F}
 dados.bulma.grid %>% 
   group_by(lat.grid.index, lon.grid.index) %>% 
-  summarise(median.duration = median(duration)) %>% 
+  summarise(median.duration = median(duration, na.rm = T)) %>% 
   ggplot(aes(lat.grid.index, lon.grid.index)) +
     geom_tile(aes(fill = median.duration**.5), colour = "white") +
     viridis::scale_fill_viridis(direction = -1)
@@ -235,7 +235,7 @@ dados.bulma.grid <- dados.bulma.grid %>%
 summarised.grid <- dados.bulma.grid %>% 
   group_by(plotting.lat, plotting.lon) %>% 
   summarise(
-    median.duration = median(duration)
+    median.duration = median(duration, na.rm = T)
   )
 
 g +
@@ -253,7 +253,7 @@ Vejamos o quanto que esses trechos se diferenciam da mediana durante a semana:
 hour.median.duration <- dados.bulma %>% 
   group_by(hourOrig) %>% 
   summarise(
-    median.duration = median(duration)
+    median.duration = median(duration, na.rm = T)
   )
 rm(dados.bulma)
 
@@ -265,7 +265,7 @@ rm(dados.bulma.grid)
 hourly.summarised.joined.grid <- joined.grid %>% 
   group_by(plotting.lat, plotting.lon) %>% 
   summarise(
-    median.diff.duration = median(diff.duration)
+    median.diff.duration = median(diff.duration, na.rm = T)
   )
 rm(joined.grid)
 
