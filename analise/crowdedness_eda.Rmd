@@ -13,7 +13,7 @@ library(ggmap)
 Importando os dados:
 
 ```{r, warning=FALSE, message=FALSE}
-path = "/local/luiz/bigsea/pre-processed-data/training_data_1_month"
+path = "~/training_data"
 
 filenames <- list.files(path, pattern = "*.csv", full.names=TRUE)
 list_of_dataframes <- lapply(filenames, read.csv)
@@ -108,7 +108,7 @@ gp.bus.crowdedness <- busData %>%
   summarise(
     max.entered.passengers = max(numPassengers, na.rm = TRUE),
     median.entered.passengers = median(numPassengers, na.rm = TRUE),
-    median.crowdedness = median(probableNumPassengers)    
+    median.crowdedness = median(probableNumPassengers, na.rm=TRUE)    
   )
 
 ggplot(gp.bus.crowdedness, aes(x = "num.passengers", max.entered.passengers)) +
@@ -197,8 +197,8 @@ Vejamos a mediana da quantidade provável de passageiros por hora do dia:
 
 ```{r, warning=FALSE, message=FALSE}
 summarised.dates <- bus.data.filt %>% group_by(date) %>%
-  summarise(meanCrowdedness = mean(probableNumPassengers),
-            medianCrowdedness = median(probableNumPassengers))
+  summarise(meanCrowdedness = mean(probableNumPassengers, na.rm=TRUE),
+            medianCrowdedness = median(probableNumPassengers, na.rm=TRUE))
 
 temp1 <- bus.data.filt %>% select(date, hourOrig, hourDest, probableNumPassengers)
 temp1 <- left_join(temp1, summarised.dates, by = "date")
@@ -210,7 +210,7 @@ temp1 <- temp1 %>% mutate(
 
 temp2 <- temp1 %>% group_by(hourOrig) %>%
   summarise(
-   medianOfDiffs = median(diffFromMedian)
+   medianOfDiffs = median(diffFromMedian, na.rm=TRUE)
 )
 rm(temp1)
 
@@ -243,7 +243,7 @@ Vemos que os dias não parecem influenciar a quantidade mediana de passageiros.
 
 ```{r, warning=FALSE, message=FALSE}
 summarised.weeks <- bus.data.filt %>% group_by(weekOfYear) %>%
-  summarise(medianWeek = median(probableNumPassengers))
+  summarise(medianWeek = median(probableNumPassengers, na.rm=TRUE))
 
 temp3 <- bus.data.filt %>% select(weekOfYear, weekDay, probableNumPassengers)
 temp3 <- left_join(temp3, summarised.weeks, by = "weekOfYear")
@@ -255,7 +255,7 @@ temp3 <- temp3 %>% mutate(
 
 temp4 <- temp3 %>% group_by(weekDay) %>%
   summarise(
-   medianOfDiffs = median(diffFromMedian)
+   medianOfDiffs = median(diffFromMedian, na.rm=TRUE)
 )
 rm(temp3)
 
@@ -312,7 +312,7 @@ bus.data.grid <- bus.data.grid %>%
 summarised.grid <- bus.data.grid %>% 
   group_by(plotting.lat, plotting.lon) %>% 
   summarise(
-    median.num.passengers = median(probableNumPassengers)
+    median.num.passengers = median(probableNumPassengers, na.rm=TRUE)
   )
 
 g +
@@ -339,7 +339,7 @@ Vejamos o quanto que esses trechos se diferenciam da mediana durante a semana:
 hour.median.num.passengers <- bus.data.filt %>% 
   group_by(hourOrig) %>% 
   summarise(
-    median.num.passengers = median(probableNumPassengers)
+    median.num.passengers = median(probableNumPassengers,na.rm=TRUE )
   )
 
 joined.grid <- left_join(bus.data.grid, hour.median.num.passengers, by = "hourOrig") %>% 
@@ -351,7 +351,7 @@ rm(bus.data.grid)
 hourly.summarised.joined.grid <- joined.grid %>% 
   group_by(plotting.lat, plotting.lon) %>% 
   summarise(
-    median.diff.num.passengers = median(diff.num.passengers)
+    median.diff.num.passengers = median(diff.num.passengers, na.rm=TRUE)
   )
 
 rm(joined.grid)
