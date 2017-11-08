@@ -25,7 +25,7 @@ def train_lasso(train_data, test_data, label, file_to_save):
     crossval = CrossValidator(estimator=duration_lr,
                               estimatorParamMaps=paramGrid,
                               evaluator=RegressionEvaluator(labelCol=label),
-                              numFolds=2)
+                              numFolds=5)
 
     cvModel = crossval.fit(train_data)
 
@@ -192,7 +192,8 @@ if __name__ == "__main__":
 
     raw_data = read_data(training_data_path)
 
-    pipeline = build_features_pipeline()
+    pipeline = build_features_pipeline(features=["busStopIdOrig", "busStopIdDest", "hourOrig",
+                             "isRushOrig", "weekOfYear", "dayOfMonth", "month", "isHoliday", "isWeekend", "isRegularDay", "distance"])
 
     transformed_data = pipeline.fit(raw_data).transform(raw_data)
 

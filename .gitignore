@@ -8,3 +8,6 @@ src/java/best-trip-recommender/.classpath
 src/java/best-trip-recommender/.gitignore
 src/java/best-trip-recommender/.settings/
 .idea/
+derby.log
+metastore_db/
+src/jobs/model-tunning/tuning-analysis.R

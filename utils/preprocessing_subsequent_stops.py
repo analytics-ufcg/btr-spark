@@ -227,11 +227,11 @@ def get_normal_distribution_list(mu, sigma, l_size):
     return norm_dist_sorted
 
 if __name__ == "__main__":
-    if len(sys.argv) < 6:
+    if len(sys.argv) < 7:
         print "Error! Your command must be something like:"
         print "spark-submit %s <btr-input-path> " \
               "<btr-pre-processing-output> <routes-stops-output-path> <initial-date(YYYY-MM-DD)> " \
-              "<final-date(YYYY-MM-DD)>" % (sys.argv[0])
+              "<final-date(YYYY-MM-DD)> <btr-outliers-output>" % (sys.argv[0])
         sys.exit(1)
 
     btr_input_path = sys.argv[1]
@@ -239,6 +239,7 @@ if __name__ == "__main__":
     routes_stops_output_path = sys.argv[3]
     initial_date = datetime.strptime(sys.argv[4], '%Y-%m-%d')
     final_date = datetime.strptime(sys.argv[5], '%Y-%m-%d')
+    btr_outliers_output = sys.argv[6]
 
     sc = SparkContext(appName="btr_pre_processing")
     sqlContext = pyspark.SQLContext(sc)
@@ -294,6 +295,10 @@ if __name__ == "__main__":
 
     output = stops_df_lead.filter("duration < 1200 and duration > 0")
 
+    outliers = stops_df_lead.filter("duration > 1199")
+
     output.write.csv(btr_pre_processing_output_path, mode="overwrite", header = True)
+
+    outliers.write.csv(btr_outliers_output, mode="overwrite", header = True)
     
     sc.stop()
