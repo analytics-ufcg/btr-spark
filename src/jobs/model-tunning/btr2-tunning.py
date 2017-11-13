@@ -42,14 +42,14 @@ def train_rf(train_data, test_data, label, file_to_save):
 
     paramGrid = (ParamGridBuilder()
              .addGrid(duration_rf.maxDepth, [2, 4, 6])
-             .addGrid(duration_rf.maxBins, [20, 60])
+             .addGrid(duration_rf.maxBins, [300])
              .addGrid(duration_rf.numTrees, [5, 20])
              .build())
 
     crossval = CrossValidator(estimator=duration_rf,
                         estimatorParamMaps=paramGrid,
                         evaluator=RegressionEvaluator(labelCol=label),
-                        numFolds=5)
+                        numFolds=2)
 
     cvModel = crossval.fit(train_data)
 
@@ -66,7 +66,7 @@ def train_gbt(train_data, test_data, label, file_to_save):
 
     paramGrid = (ParamGridBuilder()
              .addGrid(duration_gbt.maxDepth, [2, 4, 6])
-             .addGrid(duration_gbt.maxBins, [20, 60])
+             .addGrid(duration_gbt.maxBins, [300])
              .build())
 
     crossval = CrossValidator(estimator=duration_gbt,
@@ -127,10 +127,9 @@ def getPredictionsLabels(model, test_data):
     return (predictions, trainingSummary)
 
 
-def build_features_pipeline(string_columns = ["periodOrig", "weekDay"],#, "route"],
-                            features=["shapeLatOrig", "shapeLonOrig", "busStopIdOrig",
-                             "busStopIdDest", "shapeLatDest", "shapeLonDest", "hourOrig",
-                             "isRushOrig", "weekOfYear", "dayOfMonth", "month", "isHoliday", "isWeekend", "isRegularDay", "distance"]):
+def build_features_pipeline(string_columns = ["periodOrig", "weekDay", "route"],
+                            features=["busStopIdOrig", "busStopIdDest", "shapeLatOrig", "shapeLonOrig", "shapeLatDest", "shapeLonDest", "hourOrig",
+                             "isRushOrig", "isHoliday", "isWeekend", "isRegularDay", "distance", "month", "weekOfYear", "dayOfMonth"]):
 
     pipelineStages = []
 
@@ -177,7 +176,7 @@ if __name__ == "__main__":
         print "Error: Wrong parameter specification!"
         print "Your command should be something like:"
         print "spark-submit %s <training-data-path> <train-start-date(YYYY-MM-DD)> " \
-              "<train-end-date(YYYY-MM-DD)> <test-end-date(YYYY-MM-DD)> <duration-model-path>" % (sys.argv[0])
+              "<train-end-date(YYYY-MM-DD)> <test-end-date(YYYY-MM-DD)> <tunning-info-path>" % (sys.argv[0])
         sys.exit(1)
 
     training_data_path = sys.argv[1]
@@ -209,12 +208,12 @@ if __name__ == "__main__":
 
     # Lasso
     duration_lasso_model = train_lasso(train_data, test_data, duration, filepath)
-    pass_lasso_model = train_lasso(train_data, test_data, crowdedness, filepath)
+    # pass_lasso_model = train_lasso(train_data, test_data, crowdedness, filepath)
 
     # Random Forest
     duration_rf_model = train_rf(train_data, test_data, duration, filepath)
-    pass_rf_model = train_rf(train_data, test_data, crowdedness, filepath)
+    # pass_rf_model = train_rf(train_data, test_data, crowdedness, filepath)
 
     # Gradient Boosted Trees
     duration_gbt_model = train_gbt(train_data, test_data, duration, filepath)
-    pass_gbt_model = train_gbt(train_data, test_data, crowdedness, filepath)
+    # pass_gbt_model = train_gbt(train_data, test_data, crowdedness, filepath)
