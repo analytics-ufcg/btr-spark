@@ -162,6 +162,12 @@ def extract_features(df):
     # Extract total distance
     df = df.withColumn("distance", func.abs(df.distanceTraveledShapeDest - df.distanceTraveledShapeOrig))
 
+    # Derive speed from one bus stop to another in m/s
+    df = df.withColumn("speed", df.distance / df.duration)
+
+    # Derive pacing in s/m, i.e., how many seconds a bus takes to move one meter
+    df = df.withColumn("pacing", df.duration / df.distance)
+
     # Extract hour
     df = df.withColumn("hourOrig", hour("timestampOrig"))
     # Extract hour
