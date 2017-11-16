@@ -202,11 +202,6 @@ def extract_features(df):
 
     df = df.withColumn("duration", df.duration.cast('Double'))
 
-    dropna_columns = df.columns
-    dropna_columns.remove(numPassengers)        # Must not consider that column when dropping Nas
-
-    df = df.na.drop(subset = dropna_columns)
-
     return df
 
 def extract_routes_stops(df, routes_stops_output_path):
