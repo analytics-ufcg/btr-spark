@@ -6,6 +6,9 @@ from glob import glob
 from os.path import isfile, join, splitext
 import os
 os.environ["PYSPARK_PYTHON"] = "python2.7"
+from pyspark.ml.feature import StringIndexer
+from pyspark.ml.feature import VectorAssembler
+from pyspark.ml import Pipeline
 
 import pyspark
 from pyspark import SparkContext
@@ -202,6 +205,8 @@ def extract_features(df):
     is_regular_day = when((df.weekDay == "Tue") | (df.weekDay == "Wed") | (df.weekDay == "Thu"), 1).otherwise(0)
     df = df.withColumn("isRegularDay", is_regular_day)
 
+    df = df.withColumn("duration", df.duration.cast('Double')).na.drop()
+
     return df
 
 def extract_routes_stops(df, routes_stops_output_path):
@@ -210,7 +215,7 @@ def extract_routes_stops(df, routes_stops_output_path):
         .orderBy("route", "shapeId", "distanceTraveledShape")
 
     unique_stops_df.write.csv(routes_stops_output_path, mode="overwrite", header=True)
-    
+
 def get_normal_distribution_list(mu, sigma, l_size):
     dist = list()
     for i in range(l_size):
@@ -226,12 +231,31 @@ def get_normal_distribution_list(mu, sigma, l_size):
             norm_dist_sorted[-1 * (i + 1) / 2] = norm_dist[i]
     return norm_dist_sorted
 
+def build_features_pipeline(string_columns = ["periodOrig", "weekDay", "route"],
+                            features=["busStopIdOrig", "busStopIdDest", "shapeLatOrig", "shapeLonOrig", "shapeLatDest", "shapeLonDest", "hourOrig",
+                             "isRushOrig", "isHoliday", "isWeekend", "isRegularDay", "distance", "month", "weekOfYear", "dayOfMonth"]):
+
+    pipelineStages = []
+
+    indexer = [StringIndexer(inputCol = column, outputCol = column + "_index") for column in string_columns]
+
+    assembler = VectorAssembler(
+        inputCols = features + map(lambda c: c + "_index", string_columns),
+        outputCol = 'features')
+
+    pipelineStages = pipelineStages + indexer
+    pipelineStages.append(assembler)
+
+    pipeline = Pipeline(stages = pipelineStages)
+
+    return pipeline
+
 if __name__ == "__main__":
     if len(sys.argv) < 7:
         print "Error! Your command must be something like:"
         print "spark-submit %s <btr-input-path> " \
               "<btr-pre-processing-output> <routes-stops-output-path> <initial-date(YYYY-MM-DD)> " \
-              "<final-date(YYYY-MM-DD)> <btr-outliers-output>" % (sys.argv[0])
+              "<final-date(YYYY-MM-DD)> <btr-outliers-output> <file-to-save-pipeline>" % (sys.argv[0])
         sys.exit(1)
 
     btr_input_path = sys.argv[1]
@@ -240,6 +264,7 @@ if __name__ == "__main__":
     initial_date = datetime.strptime(sys.argv[4], '%Y-%m-%d')
     final_date = datetime.strptime(sys.argv[5], '%Y-%m-%d')
     btr_outliers_output = sys.argv[6]
+    pipeline_filepath = sys.argv[7]
 
     sc = SparkContext(appName="btr_pre_processing")
     sqlContext = pyspark.SQLContext(sc)
@@ -293,6 +318,14 @@ if __name__ == "__main__":
 
     stops_df_lead = extract_features(stops_df_lead)
 
+    # transform using pipeline
+    pipeline = build_features_pipeline()
+    pipeline_model = pipeline.fit(stops_df_lead)
+    transformed_data = pipeline_model.transform(stops_df_lead)
+    pipeline_model.write().overwrite().save(pipeline_filepath)
+
+    # filter data
+
     output = stops_df_lead.filter("duration < 1200 and duration > 0")
 
     outliers = stops_df_lead.filter("duration > 1199")
@@ -300,5 +333,5 @@ if __name__ == "__main__":
     output.write.csv(btr_pre_processing_output_path, mode="overwrite", header = True)
 
     outliers.write.csv(btr_outliers_output, mode="overwrite", header = True)
-    
+
     sc.stop()
