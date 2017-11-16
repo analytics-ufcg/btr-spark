@@ -147,11 +147,6 @@ def rename_columns(df, list_of_tuples):
 
     return df
 
-def weekday(date, fmt = "%Y-%m-%d"):
-    days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    wd = datetime.strptime(date, fmt).weekday()
-    return days[wd]
-
 def extract_features(df):
     print "Inicial features"
     print ["tripNumOrig", "route", "shapeId", "shapeSequence", "shapeLatOrig", "shapeLonOrig", "gpsPointId",
@@ -166,6 +161,7 @@ def extract_features(df):
 
     # Extract total distance
     df = df.withColumn("distance", func.abs(df.distanceTraveledShapeDest - df.distanceTraveledShapeOrig))
+
     # Extract hour
     df = df.withColumn("hourOrig", hour("timestampOrig"))
     # Extract hour
@@ -187,8 +183,7 @@ def extract_features(df):
                                                                     "afternoon").otherwise("night"))
     df = df.withColumn("periodDest", period_dest)
     # Extract week day
-    udf_weekday = udf(weekday, StringType())
-    df = df.withColumn("weekDay", udf_weekday("date"))
+    df = df.withColumn("weekDay", date_format('date', 'E'))
     # Extract week number
     df = df.withColumn("weekOfYear", weekofyear("date"))
     # Extract day of month
@@ -205,7 +200,12 @@ def extract_features(df):
     is_regular_day = when((df.weekDay == "Tue") | (df.weekDay == "Wed") | (df.weekDay == "Thu"), 1).otherwise(0)
     df = df.withColumn("isRegularDay", is_regular_day)
 
-    df = df.withColumn("duration", df.duration.cast('Double')).na.drop()
+    df = df.withColumn("duration", df.duration.cast('Double'))
+
+    dropna_columns = df.columns
+    dropna_columns.remove(numPassengers)        # Must not consider that column when dropping Nas
+
+    df = df.na.drop(subset = dropna_columns)
 
     return df
 
