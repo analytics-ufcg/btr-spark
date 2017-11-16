@@ -6,8 +6,7 @@ from glob import glob
 from os.path import isfile, join, splitext
 import os
 os.environ["PYSPARK_PYTHON"] = "python2.7"
-from pyspark.ml.feature import StringIndexer
-from pyspark.ml.feature import VectorAssembler
+from pyspark.ml.feature import StringIndexer, VectorAssembler, MinMaxScaler
 from pyspark.ml import Pipeline
 
 import pyspark
