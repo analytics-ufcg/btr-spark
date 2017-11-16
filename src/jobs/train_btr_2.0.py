@@ -13,11 +13,7 @@ import os
 
 
 def read_data(sqlContext, filepath):
-    df = sqlContext.read.format("com.databricks.spark.csv")\
-        .option("header", "true")\
-        .option("inferSchema", "true") \
-        .option("nullValue", "-")\
-        .load(filepath)
+    df = sqlContext.read.csv(filepath, header=True, inferSchema=True, nullValue="-")
 
     df = df.withColumn("duration", df.duration.cast('Double'))
 
@@ -91,17 +87,17 @@ def save_model(model, filepath):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 5:
+    if len(sys.argv) < 4:
         print "Error: Wrong parameter specification!"
         print "Your command should be something like:"
-        print "spark-submit --packages com.databricks:spark-csv_2.10:1.5.0 %s <training-data-path> " \
-              "<train-info-output-filepath> <duration-model-path-to-save> <crowdedness-model-path-to-save> <pipeline-path-to-save>" % (sys.argv[0])
+        print "spark-submit %s <training-data-path> " \
+              "<duration-model-path-to-save> <crowdedness-model-path-to-save> <pipeline-path-to-save>" % (sys.argv[0])
         sys.exit(1)
     #elif not os.path.exists(sys.argv[1]):
     #    print "Error: training-data-filepath doesn't exist! You must specify a valid one!"
     #    sys.exit(1)
 
-    training_data_path, train_info_output_filepath, duration_model_path_to_save, crowdedness_model_path_to_save, pipeline_path = sys.argv[1:7]
+    training_data_path, duration_model_path_to_save, crowdedness_model_path_to_save, pipeline_path = sys.argv[1:5]
 
     sc = SparkContext(appName="train_btr_2.0")
     sqlContext = pyspark.SQLContext(sc)

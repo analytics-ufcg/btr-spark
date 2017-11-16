@@ -177,7 +177,7 @@ if __name__ == "__main__":
         print "Error: Wrong parameter specification!"
         print "Your command should be something like:"
         print "spark-submit %s <training-data-path> <train-start-date(YYYY-MM-DD)> " \
-              "<train-end-date(YYYY-MM-DD)> <test-end-date(YYYY-MM-DD)> <duration-model-path>" % (sys.argv[0])
+              "<train-end-date(YYYY-MM-DD)> <test-end-date(YYYY-MM-DD)> <tunning-info-path>" % (sys.argv[0])
         sys.exit(1)
 
     training_data_path = sys.argv[1]
