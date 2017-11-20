@@ -237,14 +237,17 @@ def build_features_pipeline(string_columns = ["periodOrig", "weekDay", "route"],
 
     pipelineStages = []
 
-    indexer = [StringIndexer(inputCol = column, outputCol = column + "_index") for column in string_columns]
+    scalerVectorAssembler = VectorAssembler(inputCols=["shapeLatOrig", "shapeLonOrig", "shapeLatDest", "shapeLonDest"],
+                                  outputCol="coordinates")
+                                  
+    coordinatesScaler = MinMaxScaler(inputCol="coordinates", outputCol="scaledCoordinates")
 
-    assembler = VectorAssembler(
-        inputCols = features + map(lambda c: c + "_index", string_columns),
-        outputCol = 'features')
+    pipelineStages.append(scalerVectorAssembler)
+    pipelineStages.append(coordinatesScaler)
 
-    pipelineStages = pipelineStages + indexer
-    pipelineStages.append(assembler)
+    for column in string_columns:
+        indexer = StringIndexer(inputCol = column, outputCol = column + "_index")
+        pipelineStages.append(indexer)
 
     pipeline = Pipeline(stages = pipelineStages)
 
