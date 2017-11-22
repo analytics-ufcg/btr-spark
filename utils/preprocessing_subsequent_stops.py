@@ -6,8 +6,7 @@ from glob import glob
 from os.path import isfile, join, splitext
 import os
 os.environ["PYSPARK_PYTHON"] = "python2.7"
-from pyspark.ml.feature import StringIndexer
-from pyspark.ml.feature import VectorAssembler
+from pyspark.ml.feature import StringIndexer, VectorAssembler, MinMaxScaler
 from pyspark.ml import Pipeline
 
 import pyspark
@@ -147,11 +146,6 @@ def rename_columns(df, list_of_tuples):
 
     return df
 
-def weekday(date, fmt = "%Y-%m-%d"):
-    days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    wd = datetime.strptime(date, fmt).weekday()
-    return days[wd]
-
 def extract_features(df):
     print "Inicial features"
     print ["tripNumOrig", "route", "shapeId", "shapeSequence", "shapeLatOrig", "shapeLonOrig", "gpsPointId",
@@ -166,6 +160,13 @@ def extract_features(df):
 
     # Extract total distance
     df = df.withColumn("distance", func.abs(df.distanceTraveledShapeDest - df.distanceTraveledShapeOrig))
+
+    # Derive speed from one bus stop to another in m/s
+    df = df.withColumn("speed", df.distance / df.duration)
+
+    # Derive pacing in s/m, i.e., how many seconds a bus takes to move one meter
+    df = df.withColumn("pacing", df.duration / df.distance)
+
     # Extract hour
     df = df.withColumn("hourOrig", hour("timestampOrig"))
     # Extract hour
@@ -187,8 +188,7 @@ def extract_features(df):
                                                                     "afternoon").otherwise("night"))
     df = df.withColumn("periodDest", period_dest)
     # Extract week day
-    udf_weekday = udf(weekday, StringType())
-    df = df.withColumn("weekDay", udf_weekday("date"))
+    df = df.withColumn("weekDay", date_format('date', 'E'))
     # Extract week number
     df = df.withColumn("weekOfYear", weekofyear("date"))
     # Extract day of month
@@ -205,7 +205,7 @@ def extract_features(df):
     is_regular_day = when((df.weekDay == "Tue") | (df.weekDay == "Wed") | (df.weekDay == "Thu"), 1).otherwise(0)
     df = df.withColumn("isRegularDay", is_regular_day)
 
-    df = df.withColumn("duration", df.duration.cast('Double')).na.drop()
+    df = df.withColumn("duration", df.duration.cast('Double'))
 
     return df
 
@@ -237,14 +237,17 @@ def build_features_pipeline(string_columns = ["periodOrig", "weekDay", "route"],
 
     pipelineStages = []
 
-    indexer = [StringIndexer(inputCol = column, outputCol = column + "_index") for column in string_columns]
+    scalerVectorAssembler = VectorAssembler(inputCols=["shapeLatOrig", "shapeLonOrig", "shapeLatDest", "shapeLonDest"],
+                                  outputCol="coordinates")
 
-    assembler = VectorAssembler(
-        inputCols = features + map(lambda c: c + "_index", string_columns),
-        outputCol = 'features')
+    coordinatesScaler = MinMaxScaler(inputCol="coordinates", outputCol="scaledCoordinates")
 
-    pipelineStages = pipelineStages + indexer
-    pipelineStages.append(assembler)
+    pipelineStages.append(scalerVectorAssembler)
+    pipelineStages.append(coordinatesScaler)
+
+    for column in string_columns:
+        indexer = StringIndexer(inputCol = column, outputCol = column + "_index")
+        pipelineStages.append(indexer)
 
     pipeline = Pipeline(stages = pipelineStages)
 
@@ -317,14 +320,16 @@ if __name__ == "__main__":
     print stops_df_lead.show(10)
 
     stops_df_lead = extract_features(stops_df_lead)
-
     # transform using pipeline
-    pipeline = build_features_pipeline()
-    pipeline_model = pipeline.fit(stops_df_lead)
-    transformed_data = pipeline_model.transform(stops_df_lead)
-    pipeline_model.write().overwrite().save(pipeline_filepath)
-
-    # filter data
+    # pipeline = build_features_pipeline()
+    # pipeline_model = pipeline.fit(stops_df_lead)
+    # transformed_data = pipeline_model.transform(stops_df_lead)
+    # pipeline_model.write().overwrite().save(pipeline_filepath)
+    #
+    # # filter data
+    #
+    # transformed_data = transformed_data.withColumn("coordinates", transformed_data.coordinates.cast("String"))
+    # transformed_data = transformed_data.withColumn("scaledCoordinates", transformed_data.scaledCoordinates.cast("String"))
 
     output = stops_df_lead.filter("duration < 1200 and duration > 0")
 

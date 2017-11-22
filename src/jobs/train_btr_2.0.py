@@ -1,7 +1,7 @@
 import pyspark
 from pyspark import SparkContext
 from pyspark.ml.feature import VectorAssembler
-from pyspark.ml import Pipeline
+from pyspark.ml import Pipeline, PipelineModel
 from pyspark.ml.feature import StringIndexer
 from pyspark.mllib.evaluation import RegressionMetrics
 
@@ -10,7 +10,6 @@ from pyspark.ml.regression import LinearRegressionModel, LinearRegression
 
 import sys
 import os
-
 
 def read_data(sqlContext, filepath):
     df = sqlContext.read.csv(filepath, header=True, inferSchema=True, nullValue="-")
@@ -22,25 +21,32 @@ def read_data(sqlContext, filepath):
 
 def data_pre_proc(df, pipeline_path,
                   string_columns = ["periodOrig", "weekDay", "route"],
-                  features=["shapeLatOrig", "shapeLonOrig",
-                            "busStopIdOrig", "busStopIdDest", "shapeLatDest", "shapeLonDest",
+                  features=["busStopIdOrig", "busStopIdDest", "scaledCoordinates",
                             "hourOrig", "isRushOrig", "weekOfYear", "dayOfMonth",
                             "month", "isHoliday", "isWeekend", "isRegularDay", "distance"]):
 
-    df = df.na.drop(subset = string_columns + features)
+    # df = df.na.drop(subset = string_columns + features)
 
-    indexers = [StringIndexer(inputCol = column, outputCol = column + "_index").fit(df) for column in string_columns]
-    pipeline = Pipeline(stages = indexers)
+    # indexers = [StringIndexer(inputCol = column, outputCol = column + "_index").fit(df) for column in string_columns]
+    # pipeline = Pipeline(stages = indexers)
+
+    # pipeline.write().overwrite().save(pipeline_path)
+
+    pipeline = Pipeline.load(pipeline_path)
+
+    # df_r = pipeline.fit(df).transform(df)
+
+    featuresAssembler = VectorAssembler(
+            inputCols = features + map(lambda c: c + "_index", string_columns),
+            outputCol = 'features')
+
+    pipeline_stages = pipeline.getStages()
+    pipeline_stages.append(featuresAssembler)
+    pipeline.setStages(pipeline_stages)
 
     pipeline.write().overwrite().save(pipeline_path)
 
-    df_r = pipeline.fit(df).transform(df)
-
-    assembler = VectorAssembler(
-    inputCols = features + map(lambda c: c + "_index", string_columns),
-    outputCol = 'features')
-
-    assembled_df = assembler.transform(df_r)
+    assembled_df = featuresAssembler.transform(df)
 
     return assembled_df
 
@@ -97,7 +103,11 @@ if __name__ == "__main__":
     #    print "Error: training-data-filepath doesn't exist! You must specify a valid one!"
     #    sys.exit(1)
 
+<<<<<<< HEAD
     training_data_path, duration_model_path_to_save, crowdedness_model_path_to_save, pipeline_path = sys.argv[1:5]
+=======
+    training_data_path, train_info_output_filepath, duration_model_path_to_save, crowdedness_model_path_to_save, pipeline_path = sys.argv[1:6]
+>>>>>>> 24a3ebddb1fd2aa058a56371ab6ac32e912b8a8e
 
     sc = SparkContext(appName="train_btr_2.0")
     sqlContext = pyspark.SQLContext(sc)
