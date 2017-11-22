@@ -320,21 +320,20 @@ if __name__ == "__main__":
     print stops_df_lead.show(10)
 
     stops_df_lead = extract_features(stops_df_lead)
-
     # transform using pipeline
-    pipeline = build_features_pipeline()
-    pipeline_model = pipeline.fit(stops_df_lead)
-    transformed_data = pipeline_model.transform(stops_df_lead)
-    pipeline_model.write().overwrite().save(pipeline_filepath)
+    # pipeline = build_features_pipeline()
+    # pipeline_model = pipeline.fit(stops_df_lead)
+    # transformed_data = pipeline_model.transform(stops_df_lead)
+    # pipeline_model.write().overwrite().save(pipeline_filepath)
+    #
+    # # filter data
+    #
+    # transformed_data = transformed_data.withColumn("coordinates", transformed_data.coordinates.cast("String"))
+    # transformed_data = transformed_data.withColumn("scaledCoordinates", transformed_data.scaledCoordinates.cast("String"))
 
-    # filter data
+    output = stops_df_lead.filter("duration < 1200 and duration > 0")
 
-    transformed_data = transformed_data.withColumn("coordinates", transformed_data.coordinates.cast("String"))
-    transformed_data = transformed_data.withColumn("scaledCoordinates", transformed_data.scaledCoordinates.cast("String"))
-
-    output = transformed_data.filter("duration < 1200 and duration > 0")
-
-    outliers = transformed_data.filter("duration > 1199")
+    outliers = stops_df_lead.filter("duration > 1199")
 
     output.write.csv(btr_pre_processing_output_path, mode="overwrite", header = True)
 
