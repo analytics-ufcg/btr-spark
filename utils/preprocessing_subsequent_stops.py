@@ -258,7 +258,7 @@ if __name__ == "__main__":
         print "Error! Your command must be something like:"
         print "spark-submit %s <btr-input-path> " \
               "<btr-pre-processing-output> <routes-stops-output-path> <initial-date(YYYY-MM-DD)> " \
-              "<final-date(YYYY-MM-DD)> <btr-outliers-output> <file-to-save-pipeline>" % (sys.argv[0])
+              "<final-date(YYYY-MM-DD)> <btr-outliers-output>" % (sys.argv[0])
         sys.exit(1)
 
     btr_input_path = sys.argv[1]
@@ -267,8 +267,7 @@ if __name__ == "__main__":
     initial_date = datetime.strptime(sys.argv[4], '%Y-%m-%d')
     final_date = datetime.strptime(sys.argv[5], '%Y-%m-%d')
     btr_outliers_output = sys.argv[6]
-    pipeline_filepath = sys.argv[7]
-
+    
     sc = SparkContext(appName="btr_pre_processing")
     sqlContext = pyspark.SQLContext(sc)
 
@@ -320,16 +319,6 @@ if __name__ == "__main__":
     print stops_df_lead.show(10)
 
     stops_df_lead = extract_features(stops_df_lead)
-    # transform using pipeline
-    # pipeline = build_features_pipeline()
-    # pipeline_model = pipeline.fit(stops_df_lead)
-    # transformed_data = pipeline_model.transform(stops_df_lead)
-    # pipeline_model.write().overwrite().save(pipeline_filepath)
-    #
-    # # filter data
-    #
-    # transformed_data = transformed_data.withColumn("coordinates", transformed_data.coordinates.cast("String"))
-    # transformed_data = transformed_data.withColumn("scaledCoordinates", transformed_data.scaledCoordinates.cast("String"))
 
     output = stops_df_lead.filter("duration < 1200 and duration > 0")
 

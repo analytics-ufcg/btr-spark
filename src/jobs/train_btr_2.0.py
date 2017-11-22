@@ -25,24 +25,20 @@ def data_pre_proc(df, pipeline_path,
                             "hourOrig", "isRushOrig", "weekOfYear", "dayOfMonth",
                             "month", "isHoliday", "isWeekend", "isRegularDay", "distance"]):
 
-    # df = df.na.drop(subset = string_columns + features)
+    df = df.na.drop(subset = string_columns + features)
 
-    # indexers = [StringIndexer(inputCol = column, outputCol = column + "_index").fit(df) for column in string_columns]
-    # pipeline = Pipeline(stages = indexers)
+    pipelineStages = []
 
-    # pipeline.write().overwrite().save(pipeline_path)
+    indexers = [StringIndexer(inputCol = column, outputCol = column + "_index") for column in string_columns]
 
-    pipeline = Pipeline.load(pipeline_path)
+    assembler = VectorAssembler(
+        inputCols = features + map(lambda c: c + "_index", string_columns),
+        outputCol = 'features')
 
-    # df_r = pipeline.fit(df).transform(df)
+    pipelineStages = pipelineStages + indexers
+    pipelineStages.append(assembler)
 
-    featuresAssembler = VectorAssembler(
-            inputCols = features + map(lambda c: c + "_index", string_columns),
-            outputCol = 'features')
-
-    pipeline_stages = pipeline.getStages()
-    pipeline_stages.append(featuresAssembler)
-    pipeline.setStages(pipeline_stages)
+    pipeline = Pipeline(stages = pipelineStages)
 
     pipeline.write().overwrite().save(pipeline_path)
 
@@ -69,23 +65,26 @@ def train_crowdedness_model(training_df):
 def getPredictionsLabels(model, test_data):
     predictions = model.transform(test_data)
 
-    return predictions.rdd.map(lambda row: (row.prediction, row.duration))
+    trainingSummary = RegressionMetrics(predictions.rdd.map(lambda row: (row.prediction, row.duration)))
+
+    return (predictions, trainingSummary)
 
 
-def save_train_info(model, predictions_and_labels, output, filepath = "hdfs://localhost:9000/btr/ctba/output.txt"):
-    with open(filepath, 'a') as outfile:
-        output += "Model:\n"
-        output += "Coefficients: %s\n" % str(model.coefficients)
-        output += "Intercept: %s\n" % str(model.intercept)
-        output += "Model info\n"
+def save_train_info(model, test_data, filepath):
+    predictions, trainingSummary = getPredictionsLabels(model, test_data)
 
-        trainingSummary = RegressionMetrics(predictions_and_labels)
+    result = sqlContext.createDataFrame([
+        "Model:",
+        #"Coefficients: %s" % str(model.coefficients),
+        #"Intercept: %s" % str(model.intercept),
+        "Model info",
+        "RMSE: %f" % trainingSummary.rootMeanSquaredError,
+        "MAE: %f" % trainingSummary.meanAbsoluteError,
+        "r2: %f" % trainingSummary.r2
+        ], StringType())
 
-        output += "RMSE: %f\n" % trainingSummary.rootMeanSquaredError
-        output += "MAE: %f\n" % trainingSummary.meanAbsoluteError
-        output += "r2: %f\n" % trainingSummary.r2
 
-        outfile.write(output)
+    result.write.text(filepath + "info/")
 
 
 def save_model(model, filepath):
@@ -97,17 +96,14 @@ if __name__ == "__main__":
         print "Error: Wrong parameter specification!"
         print "Your command should be something like:"
         print "spark-submit %s <training-data-path> " \
-              "<duration-model-path-to-save> <crowdedness-model-path-to-save> <pipeline-path-to-save>" % (sys.argv[0])
+              "<duration-model-path-to-save> <crowdedness-model-path-to-save> <pipeline-path-to-save>, <train-info-path>" % (sys.argv[0])
         sys.exit(1)
     #elif not os.path.exists(sys.argv[1]):
     #    print "Error: training-data-filepath doesn't exist! You must specify a valid one!"
     #    sys.exit(1)
 
-<<<<<<< HEAD
-    training_data_path, duration_model_path_to_save, crowdedness_model_path_to_save, pipeline_path = sys.argv[1:5]
-=======
-    training_data_path, train_info_output_filepath, duration_model_path_to_save, crowdedness_model_path_to_save, pipeline_path = sys.argv[1:6]
->>>>>>> 24a3ebddb1fd2aa058a56371ab6ac32e912b8a8e
+    training_data_path, duration_model_path_to_save, crowdedness_model_path_to_save, pipeline_path, train_info_path = sys.argv[1:6]
+
 
     sc = SparkContext(appName="train_btr_2.0")
     sqlContext = pyspark.SQLContext(sc)
@@ -125,12 +121,11 @@ if __name__ == "__main__":
     duration_predictions_and_labels = getPredictionsLabels(duration_model, test)
     crowdedness_predictions_and_labels = getPredictionsLabels(crowdedness_model, test)
 
-    #save_train_info(duration_model, duration_predictions_and_labels, "Duration model\n", train_info_output_filepath)
-    #save_train_info(crowdedness_model, crowdedness_predictions_and_labels, "Crowdedness model\n", train_info_output_filepath)
+    save_train_info(duration_model, duration_predictions_and_labels, "Duration model\n", train_info_output_filepath)
+    save_train_info(crowdedness_model, crowdedness_predictions_and_labels, "Crowdedness model\n", train_info_output_filepath)
 
     save_model(duration_model, duration_model_path_to_save)
     save_model(crowdedness_model, crowdedness_model_path_to_save)
 
-    #duration_model_loaded = LinearRegressionModel.load(duration_model_path_to_save)
 
     sc.stop()
