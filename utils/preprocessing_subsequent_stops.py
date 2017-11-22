@@ -239,7 +239,7 @@ def build_features_pipeline(string_columns = ["periodOrig", "weekDay", "route"],
 
     scalerVectorAssembler = VectorAssembler(inputCols=["shapeLatOrig", "shapeLonOrig", "shapeLatDest", "shapeLonDest"],
                                   outputCol="coordinates")
-                                  
+
     coordinatesScaler = MinMaxScaler(inputCol="coordinates", outputCol="scaledCoordinates")
 
     pipelineStages.append(scalerVectorAssembler)
@@ -329,9 +329,12 @@ if __name__ == "__main__":
 
     # filter data
 
-    output = stops_df_lead.filter("duration < 1200 and duration > 0")
+    transformed_data = transformed_data.withColumn("coordinates", transformed_data.coordinates.cast("String"))
+    transformed_data = transformed_data.withColumn("scaledCoordinates", transformed_data.scaledCoordinates.cast("String"))
 
-    outliers = stops_df_lead.filter("duration > 1199")
+    output = transformed_data.filter("duration < 1200 and duration > 0")
+
+    outliers = transformed_data.filter("duration > 1199")
 
     output.write.csv(btr_pre_processing_output_path, mode="overwrite", header = True)
 
