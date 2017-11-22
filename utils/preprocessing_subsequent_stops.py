@@ -6,7 +6,7 @@ from glob import glob
 from os.path import isfile, join, splitext
 import os
 os.environ["PYSPARK_PYTHON"] = "python2.7"
-from pyspark.ml.feature import StringIndexer, VectorAssembler, MinMaxScaler
+from pyspark.ml.feature import StringIndexer
 from pyspark.ml import Pipeline
 
 import pyspark
@@ -231,27 +231,6 @@ def get_normal_distribution_list(mu, sigma, l_size):
             norm_dist_sorted[-1 * (i + 1) / 2] = norm_dist[i]
     return norm_dist_sorted
 
-def build_features_pipeline(string_columns = ["periodOrig", "weekDay", "route"],
-                            features=["busStopIdOrig", "busStopIdDest", "shapeLatOrig", "shapeLonOrig", "shapeLatDest", "shapeLonDest", "hourOrig",
-                             "isRushOrig", "isHoliday", "isWeekend", "isRegularDay", "distance", "month", "weekOfYear", "dayOfMonth"]):
-
-    pipelineStages = []
-
-    scalerVectorAssembler = VectorAssembler(inputCols=["shapeLatOrig", "shapeLonOrig", "shapeLatDest", "shapeLonDest"],
-                                  outputCol="coordinates")
-
-    coordinatesScaler = MinMaxScaler(inputCol="coordinates", outputCol="scaledCoordinates")
-
-    pipelineStages.append(scalerVectorAssembler)
-    pipelineStages.append(coordinatesScaler)
-
-    for column in string_columns:
-        indexer = StringIndexer(inputCol = column, outputCol = column + "_index")
-        pipelineStages.append(indexer)
-
-    pipeline = Pipeline(stages = pipelineStages)
-
-    return pipeline
 
 if __name__ == "__main__":
     if len(sys.argv) < 7:
@@ -320,16 +299,6 @@ if __name__ == "__main__":
     print stops_df_lead.show(10)
 
     stops_df_lead = extract_features(stops_df_lead)
-    # transform using pipeline
-    # pipeline = build_features_pipeline()
-    # pipeline_model = pipeline.fit(stops_df_lead)
-    # transformed_data = pipeline_model.transform(stops_df_lead)
-    # pipeline_model.write().overwrite().save(pipeline_filepath)
-    #
-    # # filter data
-    #
-    # transformed_data = transformed_data.withColumn("coordinates", transformed_data.coordinates.cast("String"))
-    # transformed_data = transformed_data.withColumn("scaledCoordinates", transformed_data.scaledCoordinates.cast("String"))
 
     output = stops_df_lead.filter("duration < 1200 and duration > 0")
 

@@ -1,7 +1,7 @@
 import pyspark
 from pyspark import SparkContext
-from pyspark.ml.feature import VectorAssembler
-from pyspark.ml import Pipeline, PipelineModel
+from pyspark.ml.feature import VectorAssembler, MinMaxScaler
+from pyspark.ml import Pipeline
 from pyspark.ml.feature import StringIndexer
 from pyspark.mllib.evaluation import RegressionMetrics
 
@@ -22,38 +22,39 @@ def read_data(sqlContext, filepath):
 
     return df
 
+# df = df.na.drop(subset = string_columns + features)
 
-def data_pre_proc(df, pipeline_path,
-                  string_columns = ["periodOrig", "weekDay", "route"],
-                  features=["busStopIdOrig", "busStopIdDest", "scaledCoordinates",
-                            "hourOrig", "isRushOrig", "weekOfYear", "dayOfMonth",
-                            "month", "isHoliday", "isWeekend", "isRegularDay", "distance"]):
+def execute_preproc_pipeline(df, pipeline_path, string_columns = ["periodOrig", "weekDay", "route"],
+                            features=["busStopIdOrig", "busStopIdDest", "shapeLatOrig", "shapeLonOrig", "shapeLatDest", "shapeLonDest", "hourOrig",
+                             "isRushOrig", "isHoliday", "isWeekend", "isRegularDay", "distance", "month", "weekOfYear", "dayOfMonth"]):
+    pipelineStages = []
 
-    # df = df.na.drop(subset = string_columns + features)
+    # Assemble a vector with coordinates that will be the input of the scaler
+    scalerVectorAssembler = VectorAssembler(inputCols=["shapeLatOrig", "shapeLonOrig", "shapeLatDest", "shapeLonDest"],
+                                  outputCol="coordinates")
+    # Normalize the scale of coordinates
+    coordinatesScaler = MinMaxScaler(inputCol="coordinates", outputCol="scaledCoordinates")
 
-    # indexers = [StringIndexer(inputCol = column, outputCol = column + "_index").fit(df) for column in string_columns]
-    # pipeline = Pipeline(stages = indexers)
+    pipelineStages.append(scalerVectorAssembler)
+    pipelineStages.append(coordinatesScaler)
 
-    # pipeline.write().overwrite().save(pipeline_path)
-
-    pipeline = Pipeline.load(pipeline_path)
-
-    # df_r = pipeline.fit(df).transform(df)
-
+    # Add _index to categorical variables
+    for column in string_columns:
+        indexer = StringIndexer(inputCol = column, outputCol = column + "_index")
+        pipelineStages.append(indexer)
+    # Assemble a vector with all the features that will be the input of the model
     featuresAssembler = VectorAssembler(
             inputCols = features + map(lambda c: c + "_index", string_columns),
             outputCol = 'features')
 
-    pipeline_stages = pipeline.getStages()
-    pipeline_stages.append(featuresAssembler)
-    pipeline.setStages(pipeline_stages)
+    pipelineStages.append(featuresAssembler)
 
-    pipeline.write().overwrite().save(pipeline_path)
+    pipeline = Pipeline(stages = pipelineStages)
+    pipelineModel =  pipeline.fit(df)
+    pipelineModel.write().overwrite().save(pipeline_path)
+    df = pipelineModel.transform(df)
 
-    assembled_df = featuresAssembler.transform(df)
-
-    return assembled_df
-
+    return df
 
 def train_duration_model(training_df):
     duration_lr = LinearRegression(maxIter=10, regParam=0.01, elasticNetParam=1.0).setLabelCol("duration").setFeaturesCol("features")
@@ -113,7 +114,7 @@ if __name__ == "__main__":
     sqlContext = pyspark.SQLContext(sc)
     data = read_data(sqlContext, training_data_path)
 
-    preproc_data = data_pre_proc(data, pipeline_path)
+    preproc_data = execute_preproc_pipeline(data, pipeline_path)
 
     train, test = preproc_data.randomSplit([0.7, 0.3], 24)
 
