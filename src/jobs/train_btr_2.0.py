@@ -1,9 +1,10 @@
 import pyspark
 from pyspark import SparkContext
-from pyspark.ml.feature import VectorAssembler
-from pyspark.ml import Pipeline, PipelineModel
+from pyspark.ml.feature import VectorAssembler, MinMaxScaler
+from pyspark.ml import Pipeline
 from pyspark.ml.feature import StringIndexer
 from pyspark.mllib.evaluation import RegressionMetrics
+from pyspark.sql.types import StringType
 
 # MLlib
 from pyspark.ml.regression import LinearRegressionModel, LinearRegression
@@ -18,34 +19,39 @@ def read_data(sqlContext, filepath):
 
     return df
 
+# df = df.na.drop(subset = string_columns + features)
 
-def data_pre_proc(df, pipeline_path,
-                  string_columns = ["periodOrig", "weekDay", "route"],
-                  features=["busStopIdOrig", "busStopIdDest", "scaledCoordinates",
-                            "hourOrig", "isRushOrig", "weekOfYear", "dayOfMonth",
-                            "month", "isHoliday", "isWeekend", "isRegularDay", "distance"]):
-
-    df = df.na.drop(subset = string_columns + features)
-
+def execute_preproc_pipeline(df, pipeline_path, string_columns = ["periodOrig", "weekDay"],#, "route"],
+                            features=["shapeLatOrig", "shapeLonOrig", "shapeLatDest", "shapeLonDest", "hourOrig",
+                             "isRushOrig", "isHoliday", "isWeekend", "isRegularDay", "distance", "month", "weekOfYear", "dayOfMonth"]):
     pipelineStages = []
 
-    indexers = [StringIndexer(inputCol = column, outputCol = column + "_index") for column in string_columns]
+    # Assemble a vector with coordinates that will be the input of the scaler
+    scalerVectorAssembler = VectorAssembler(inputCols=["shapeLatOrig", "shapeLonOrig", "shapeLatDest", "shapeLonDest"],
+                                  outputCol="coordinates")
+    # Normalize the scale of coordinates
+    coordinatesScaler = MinMaxScaler(inputCol="coordinates", outputCol="scaledCoordinates")
 
-    assembler = VectorAssembler(
-        inputCols = features + map(lambda c: c + "_index", string_columns),
-        outputCol = 'features')
+    pipelineStages.append(scalerVectorAssembler)
+    pipelineStages.append(coordinatesScaler)
 
-    pipelineStages = pipelineStages + indexers
-    pipelineStages.append(assembler)
+    # Add _index to categorical variables
+    for column in string_columns:
+        indexer = StringIndexer(inputCol = column, outputCol = column + "_index")
+        pipelineStages.append(indexer)
+    # Assemble a vector with all the features that will be the input of the model
+    featuresAssembler = VectorAssembler(
+            inputCols = features + map(lambda c: c + "_index", string_columns),
+            outputCol = 'features')
+
+    pipelineStages.append(featuresAssembler)
 
     pipeline = Pipeline(stages = pipelineStages)
+    pipelineModel =  pipeline.fit(df)
+    pipelineModel.write().overwrite().save(pipeline_path)
+    df = pipelineModel.transform(df)
 
-    pipeline.write().overwrite().save(pipeline_path)
-
-    assembled_df = featuresAssembler.transform(df)
-
-    return assembled_df
-
+    return df
 
 def train_duration_model(training_df):
     duration_lr = LinearRegression(maxIter=10, regParam=0.01, elasticNetParam=1.0).setLabelCol("duration").setFeaturesCol("features")
@@ -70,7 +76,7 @@ def getPredictionsLabels(model, test_data):
     return (predictions, trainingSummary)
 
 
-def save_train_info(model, test_data, filepath):
+def save_train_info(model, test_data, model_name, filepath):
     predictions, trainingSummary = getPredictionsLabels(model, test_data)
 
     result = sqlContext.createDataFrame([
@@ -84,7 +90,7 @@ def save_train_info(model, test_data, filepath):
         ], StringType())
 
 
-    result.write.text(filepath + "info/")
+    result.write.text(filepath + model_name)
 
 
 def save_model(model, filepath):
@@ -92,24 +98,29 @@ def save_model(model, filepath):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 4:
+    if len(sys.argv) < 3:
         print "Error: Wrong parameter specification!"
         print "Your command should be something like:"
         print "spark-submit %s <training-data-path> " \
-              "<duration-model-path-to-save> <crowdedness-model-path-to-save> <pipeline-path-to-save>, <train-info-path>" % (sys.argv[0])
+              "<output-folder-path>" % (sys.argv[0])
         sys.exit(1)
     #elif not os.path.exists(sys.argv[1]):
     #    print "Error: training-data-filepath doesn't exist! You must specify a valid one!"
     #    sys.exit(1)
 
-    training_data_path, duration_model_path_to_save, crowdedness_model_path_to_save, pipeline_path, train_info_path = sys.argv[1:6]
+    training_data_path = sys.argv[1]
+    output_folder_path = sys.argv[2]
+    duration_model_path_to_save = output_folder_path + "duration-model/"
+    crowdedness_model_path_to_save = output_folder_path + "crowdedness-model/"
+    pipeline_path = output_folder_path + "pipeline/"
+    train_info_path = output_folder_path + "train-info/"
 
 
     sc = SparkContext(appName="train_btr_2.0")
     sqlContext = pyspark.SQLContext(sc)
     data = read_data(sqlContext, training_data_path)
 
-    preproc_data = data_pre_proc(data, pipeline_path)
+    preproc_data = execute_preproc_pipeline(data, pipeline_path)
 
     train, test = preproc_data.randomSplit([0.7, 0.3], 24)
 
@@ -118,11 +129,11 @@ if __name__ == "__main__":
     # Crowdedness
     crowdedness_model = train_crowdedness_model(train)
 
-    duration_predictions_and_labels = getPredictionsLabels(duration_model, test)
-    crowdedness_predictions_and_labels = getPredictionsLabels(crowdedness_model, test)
+    # duration_predictions_and_labels = getPredictionsLabels(duration_model, test)
+    # crowdedness_predictions_and_labels = getPredictionsLabels(crowdedness_model, test)
 
-    save_train_info(duration_model, duration_predictions_and_labels, "Duration model\n", train_info_output_filepath)
-    save_train_info(crowdedness_model, crowdedness_predictions_and_labels, "Crowdedness model\n", train_info_output_filepath)
+    save_train_info(duration_model, test, "duration", train_info_path)
+    save_train_info(crowdedness_model, test, "crowdedness", train_info_path)
 
     save_model(duration_model, duration_model_path_to_save)
     save_model(crowdedness_model, crowdedness_model_path_to_save)

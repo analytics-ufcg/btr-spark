@@ -6,7 +6,7 @@ from glob import glob
 from os.path import isfile, join, splitext
 import os
 os.environ["PYSPARK_PYTHON"] = "python2.7"
-from pyspark.ml.feature import StringIndexer, VectorAssembler, MinMaxScaler
+from pyspark.ml.feature import StringIndexer
 from pyspark.ml import Pipeline
 
 import pyspark
@@ -231,42 +231,23 @@ def get_normal_distribution_list(mu, sigma, l_size):
             norm_dist_sorted[-1 * (i + 1) / 2] = norm_dist[i]
     return norm_dist_sorted
 
-def build_features_pipeline(string_columns = ["periodOrig", "weekDay", "route"],
-                            features=["busStopIdOrig", "busStopIdDest", "shapeLatOrig", "shapeLonOrig", "shapeLatDest", "shapeLonDest", "hourOrig",
-                             "isRushOrig", "isHoliday", "isWeekend", "isRegularDay", "distance", "month", "weekOfYear", "dayOfMonth"]):
-
-    pipelineStages = []
-
-    scalerVectorAssembler = VectorAssembler(inputCols=["shapeLatOrig", "shapeLonOrig", "shapeLatDest", "shapeLonDest"],
-                                  outputCol="coordinates")
-
-    coordinatesScaler = MinMaxScaler(inputCol="coordinates", outputCol="scaledCoordinates")
-
-    pipelineStages.append(scalerVectorAssembler)
-    pipelineStages.append(coordinatesScaler)
-
-    for column in string_columns:
-        indexer = StringIndexer(inputCol = column, outputCol = column + "_index")
-        pipelineStages.append(indexer)
-
-    pipeline = Pipeline(stages = pipelineStages)
-
-    return pipeline
 
 if __name__ == "__main__":
-    if len(sys.argv) < 7:
+    if len(sys.argv) < 5:
         print "Error! Your command must be something like:"
         print "spark-submit %s <btr-input-path> " \
-              "<btr-pre-processing-output> <routes-stops-output-path> <initial-date(YYYY-MM-DD)> " \
+              "<btr-pre-processing-output-folder> <initial-date(YYYY-MM-DD)> " \
               "<final-date(YYYY-MM-DD)> <btr-outliers-output>" % (sys.argv[0])
         sys.exit(1)
 
     btr_input_path = sys.argv[1]
     btr_pre_processing_output_path = sys.argv[2]
-    routes_stops_output_path = sys.argv[3]
-    initial_date = datetime.strptime(sys.argv[4], '%Y-%m-%d')
-    final_date = datetime.strptime(sys.argv[5], '%Y-%m-%d')
-    btr_outliers_output = sys.argv[6]
+    initial_date = datetime.strptime(sys.argv[3], '%Y-%m-%d')
+    final_date = datetime.strptime(sys.argv[4], '%Y-%m-%d')
+
+    btr_pre_processing_data_path = btr_pre_processing_output_path + "train_data"    
+    routes_stops_output_path = btr_pre_processing_output_path + "routes_stops"
+    btr_outliers_output = btr_pre_processing_output_path + "outliers"
     
     sc = SparkContext(appName="btr_pre_processing")
     sqlContext = pyspark.SQLContext(sc)
@@ -324,7 +305,7 @@ if __name__ == "__main__":
 
     outliers = stops_df_lead.filter("duration > 1199")
 
-    output.write.csv(btr_pre_processing_output_path, mode="overwrite", header = True)
+    output.write.csv(btr_pre_processing_data_path, mode="overwrite", header = True)
 
     outliers.write.csv(btr_outliers_output, mode="overwrite", header = True)
 
