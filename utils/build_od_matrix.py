@@ -38,11 +38,11 @@ def dist(lat_x, long_x, lat_y, long_y):
 def printdf(df,l=10):
     return df.limit(l).toPandas()
 
-def buildODMatrix(datapath):
+def buildODMatrix(buste_data):
 
-	buste_data = read_hdfs_folder(sqlContext, datapath + '/bulma-output/2017_05_11_veiculos/')
+	# buste_data = read_hdfs_folder(sqlContext, datapath + '/bulma-output/2017_05_11_veiculos/')
 
-	clean_buste_data = buste_data.na.drop(subset=["date","route","busCode","tripNum","stopPointId","timestamp","shapeLon","shapeLat"])
+	clean_buste_data = buste_data.na.drop(subset=["date","route","busCode","tripNum","busStopId","timestamp","shapeLon","shapeLat"])
 
 	filtered_boardings = clean_buste_data.na.drop(subset=['cardNum','cardTimestamp']).dropDuplicates(['cardNum','date','cardTimestamp'])
 
@@ -75,7 +75,7 @@ def buildODMatrix(datapath):
 	                                    F.col("shapeSequence").alias("o_shape_seq"),
 	                                    F.col("shapeLat").alias("o_shape_lat"),
 	                                    F.col("shapeLon").alias("o_shape_lon"),
-	                                    F.col("stopPointId").alias("o_stop_id"),
+	                                    F.col("busStopId").alias("o_stop_id"),
 	                                    F.col("boarding_id").alias("o_boarding_id"))
 
 
@@ -88,7 +88,7 @@ def buildODMatrix(datapath):
 	                                    F.col("shapeSequence").alias("next_o_shape_seq"),
 	                                    F.col("shapeLat").alias("next_o_shape_lat"),
 	                                    F.col("shapeLon").alias("next_o_shape_lon"),
-	                                    F.col("stopPointId").alias("next_o_stop_id"),
+	                                    F.col("busStopId").alias("next_o_stop_id"),
 	                                    F.col("boarding_id").alias("next_o_boarding_id"))
 
 
@@ -101,7 +101,7 @@ def buildODMatrix(datapath):
 	user_trips_data = user_trips.withColumn('o_date',F.from_unixtime(F.unix_timestamp(F.col('o_date'),'yyyy-MM-dd'), 'yyyy-MM-dd')).withColumn('next_o_date',F.from_unixtime(F.unix_timestamp(F.col('next_o_date'),'yyyy-MM-dd'), 'yyyy-MM-dd')).orderBy(['cardNum','o_date','o_timestamp'])
 
 	bus_trip_data = clean_buste_data.orderBy(['route','busCode','tripNum','timestamp']) \
-	                            .dropDuplicates(['route','busCode','tripNum','stopPointId']) \
+	                            .dropDuplicates(['route','busCode','tripNum','busStopId']) \
 	                            .drop('cardNum') \
 	                            .withColumn('id',F.monotonically_increasing_id()) \
 	                            .withColumn('route', F.col('route').cast(T.IntegerType())) \
@@ -134,8 +134,8 @@ def buildODMatrix(datapath):
 	                            .orderBy(['o_date','o_route','o_bus_code','o_tripNum'])
 
 	trips_destinations = filtered_od_matrix.filter(filtered_od_matrix.cardNum.isNotNull()) \
-	                            .select(['date','route','busCode','tripNum','stopPointId','timestamp']) \
-	                            .groupBy(['date','route','busCode','tripNum','stopPointId']) \
+	                            .select(['date','route','busCode','tripNum','busStopId','timestamp']) \
+	                            .groupBy(['date','route','busCode','tripNum','busStopId']) \
 	                            .count() \
 	                            .orderBy(['date','route','busCode','tripNum'])
 
@@ -145,20 +145,20 @@ def buildODMatrix(datapath):
 	                         ('route','d_route'),
 	                         ('busCode','d_bus_code'),
 	                         ('tripNum','d_tripNum'),
-	                         ('stopPointId','d_stop_id'),
+	                         ('busStopId','d_stop_id'),
 	                         ('count','alighting_cnt')])
 
 	origin_cond = [bus_trip_data.date == trips_origins.o_date,
 	               bus_trip_data.route == trips_origins.o_route, 
 	               bus_trip_data.busCode == trips_origins.o_bus_code, 
 	               bus_trip_data.tripNum == trips_origins.o_tripNum,
-	               bus_trip_data.stopPointId == trips_origins.o_stop_id]
+	               bus_trip_data.busStopId == trips_origins.o_stop_id]
 
 	dest_cond = [bus_trip_data.date == trips_destinations.d_date,
 	               bus_trip_data.route == trips_destinations.d_route, 
 	               bus_trip_data.busCode == trips_destinations.d_bus_code, 
 	               bus_trip_data.tripNum == trips_destinations.d_tripNum,
-	               bus_trip_data.stopPointId == trips_destinations.d_stop_id]
+	               bus_trip_data.busStopId == trips_destinations.d_stop_id]
 
 	buste_crowdedness = bus_trip_data.join(trips_origins,origin_cond,'left_outer') \
 	                        .join(trips_destinations,dest_cond,'left_outer') \
@@ -189,8 +189,9 @@ def buildODMatrix(datapath):
 	                                .drop('overall_boarding','odmatrix_boarding') \
 	                                .withColumn('ext_num_pass', F.col('num_pass')*F.col('extrap_factor'))
 
-	buste_crowdedness_extrapolated.write.csv(path=datapath+'/buste_crowdedness',header=True, mode='overwrite')
+	# buste_crowdedness_extrapolated.write.csv(path=datapath+'/buste_crowdedness',header=True, mode='overwrite')
 
+	return buste_crowdedness_extrapolated
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

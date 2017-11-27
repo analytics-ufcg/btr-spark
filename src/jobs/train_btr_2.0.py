@@ -61,7 +61,7 @@ def train_duration_model(training_df):
     return duration_lr_model
 
 def train_crowdedness_model(training_df):
-    crowdedness_lr = LinearRegression(maxIter=10, regParam=0.01, elasticNetParam=1.0).setLabelCol("probableNumPassengers").setFeaturesCol("features")
+    crowdedness_lr = LinearRegression(maxIter=10, regParam=0.01, elasticNetParam=1.0).setLabelCol("crowdedness").setFeaturesCol("features")
 
     crowdedness_lr_model = crowdedness_lr.fit(training_df)
 
@@ -90,7 +90,7 @@ def save_train_info(model, test_data, model_name, filepath):
         ], StringType())
 
 
-    result.write.text(filepath + model_name)
+    result.write.mode("overwrite").text(filepath + model_name)
 
 
 def save_model(model, filepath):
@@ -127,13 +127,10 @@ if __name__ == "__main__":
     # Duration
     duration_model = train_duration_model(train)
     # Crowdedness
-    crowdedness_model = train_crowdedness_model(train)
-
-    # duration_predictions_and_labels = getPredictionsLabels(duration_model, test)
-    # crowdedness_predictions_and_labels = getPredictionsLabels(crowdedness_model, test)
+    crowdedness_model = train_crowdedness_model(train.na.drop(subset=["crowdedness"]))
 
     save_train_info(duration_model, test, "duration", train_info_path)
-    save_train_info(crowdedness_model, test, "crowdedness", train_info_path)
+    save_train_info(crowdedness_model, test.na.drop(subset=["crowdedness"]), "crowdedness", train_info_path)
 
     save_model(duration_model, duration_model_path_to_save)
     save_model(crowdedness_model, crowdedness_model_path_to_save)

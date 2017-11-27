@@ -18,10 +18,12 @@ from pyspark.sql.types import StructType, StructField, DoubleType, StringType, I
 
 from datetime import datetime
 
+import build_od_matrix as odm
+
 import random
 
 def read_file(filepath, sqlContext):
-    data_frame = sqlContext.read.csv(filepath, header=False, inferSchema=True, nullValue="-")
+    data_frame = sqlContext.read.csv(filepath, header=True, inferSchema=True, nullValue="-")
 
     while len(data_frame.columns) < 16:
         col_name = "_c" + str(len(data_frame.columns))
@@ -30,22 +32,22 @@ def read_file(filepath, sqlContext):
     data_frame = rename_columns(
         data_frame,
         [
-            ("_c0", "route"),
-            ("_c1", "tripNum"),
-            ("_c2", "shapeId"),
-            ("_c3", "shapeSequence"),
-            ("_c4", "shapeLat"),
-            ("_c5", "shapeLon"),
-            ("_c6", "distanceTraveledShape"),
-            ("_c7", "busCode"),
-            ("_c8", "gpsPointId"),
-            ("_c9", "gpsLat"),
-            ("_c10", "gpsLon"),
-            ("_c11", "distanceToShapePoint"),
-            ("_c12", "timestamp"),
-            ("_c13", "busStopId"),
-            ("_c14", "problem"),
-            ("_c15", "numPassengers")
+    #         ("_c0", "route"),
+    #         ("_c1", "tripNum"),
+    #         ("_c2", "shapeId"),
+    #         ("_c3", "shapeSequence"),
+    #         ("_c4", "shapeLat"),
+    #         ("_c5", "shapeLon"),
+    #         ("_c6", "distanceTraveledShape"),
+    #         ("_c7", "busCode"),
+    #         ("_c8", "gpsPointId"),
+    #         ("_c9", "gpsLat"),
+    #         ("_c10", "gpsLon"),
+    #         ("_c11", "distanceToShapePoint"),
+    #         ("_c12", "timestamp"),
+            ("stopPointId", "busStopId")
+    #         ("_c14", "problem"),
+    #         ("_c15", "numPassengers")
         ]
     )
 
@@ -80,7 +82,7 @@ def read_files(path, sqlContext, sc, initial_date, final_date):
 
         print files
 
-        files = filter(lambda f: initial_date <= datetime.strptime(f.split("/")[-2], '%Y_%m_%d_veiculos.csv') <=
+        files = filter(lambda f: initial_date <= datetime.strptime(f.split("/")[-2], '%Y_%m_%d_veiculos') <=
                                  final_date, files)
 
         print files
@@ -157,6 +159,8 @@ def extract_features(df):
     time_fmt = "HH:mm:ss"
     time_difference = unix_timestamp("timestampDest", time_fmt) - unix_timestamp("timestampOrig", time_fmt)
     df = df.withColumn("duration", time_difference)
+
+    df = df.withColumnRenamed("ext_num_pass", "crowdedness")
 
     # Extract total distance
     df = df.withColumn("distance", func.abs(df.distanceTraveledShapeDest - df.distanceTraveledShapeOrig))
@@ -254,9 +258,13 @@ if __name__ == "__main__":
 
     trips_df = read_files(btr_input_path, sqlContext, sc, initial_date, final_date)
 
+    trips_df = odm.buildODMatrix(trips_df)
+
     stops_df = trips_df.na.drop(subset=["busStopId"])
 
     extract_routes_stops(stops_df, routes_stops_output_path)
+
+    print stops_df.printSchema
 
     w = Window().partitionBy("date", "route", "shapeId", "busCode", "tripNum").orderBy("timestamp")
 
@@ -275,11 +283,11 @@ if __name__ == "__main__":
 
 
 
-    stops_df_lead = add_accumulated_passengers(
-        stops_df_lead,
-        w,
-        probs=get_normal_distribution_list(40, 10, 66)
-    )
+    # stops_df_lead = add_accumulated_passengers(
+    #     stops_df_lead,
+    #     w,
+    #     probs=get_normal_distribution_list(40, 10, 66)
+    # )
 
     stops_df_lead = rename_columns(
         stops_df_lead,
