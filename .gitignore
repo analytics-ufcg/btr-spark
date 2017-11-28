@@ -11,3 +11,4 @@ src/java/best-trip-recommender/.settings/
 derby.log
 metastore_db/
 src/jobs/model-tunning/tuning-analysis.R
+*.pyc
