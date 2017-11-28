@@ -1,6 +1,6 @@
 import pyspark
 from pyspark import SparkContext
-from pyspark.ml.feature import VectorAssembler
+from pyspark.ml.feature import VectorAssembler, MinMaxScaler
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import StringIndexer
 from pyspark.sql.types import StringType
@@ -29,6 +29,15 @@ def train_lasso(train_data, test_data, label, file_to_save):
 
     cvModel = crossval.fit(train_data)
 
+    bestModel = cvModel.bestModel
+    regParam = bestModel._java_obj.getRegParam()
+    maxIter = bestModel._java_obj.getMaxIter()
+
+    with open(filepath + 'params/' + 'lassoParams.csv','wb') as file:
+        file.write("param, value" + '\n')
+        file.write("maxIter, " + str(maxIter) + '\n')
+        file.write("regParam, " + str(regParam) + '\n')
+
     save_test_info(cvModel.bestModel, test_data, label + "-lasso", file_to_save)
 
     return cvModel
@@ -53,7 +62,18 @@ def train_rf(train_data, test_data, label, file_to_save):
 
     cvModel = crossval.fit(train_data)
 
-    save_test_info(cvModel.bestModel, test_data, label + "-random-forest", file_to_save)
+    bestModel = cvModel.bestModel
+    maxDepth = bestModel._java_obj.getMaxDepth()
+    maxBins = bestModel._java_obj.getMaxBins()
+    numTrees = bestModel._java_obj.getnumTrees()
+
+    with open(filepath + 'params/' + 'randomForestParams.csv','wb') as file:
+        file.write("param, value" + '\n')
+        file.write("maxDepth, " + str(maxDepth) + '\n')
+        file.write("maxBins, " + str(maxBins) + '\n')
+        file.write("numTrees, " + str(numTrees) + '\n')
+
+    save_test_info(bestModel, test_data, label + "-random-forest", file_to_save)
 
     return cvModel;
 
@@ -75,6 +95,15 @@ def train_gbt(train_data, test_data, label, file_to_save):
                         numFolds=5)
 
     cvModel = crossval.fit(train_data)
+
+    bestModel = cvModel.bestModel
+    maxDepth = bestModel._java_obj.getMaxDepth()
+    maxBins = bestModel._java_obj.getMaxBins()
+
+    with open(filepath + 'params/' + 'GBTParams.csv','wb') as file:
+        file.write("param, value" + '\n')
+        file.write("maxDepth, " + str(maxDepth) + '\n')
+        file.write("maxBins, " + str(maxBins) + '\n')
 
     save_test_info(cvModel.bestModel, test_data, label + "-gbt", file_to_save)
 
@@ -116,7 +145,7 @@ def save_test_info(model, test_data, model_name, filepath):
 
     model.write().overwrite().save(filepath + "model/" + model_name)
 
-    result.write.text(filepath + "info/" + model_name)
+    result.write.text(filepath + "info/" + model_name).mode("overwrite")
 
 
 def getPredictionsLabels(model, test_data):
@@ -127,24 +156,39 @@ def getPredictionsLabels(model, test_data):
     return (predictions, trainingSummary)
 
 
-def build_features_pipeline(string_columns = ["periodOrig", "weekDay", "route"],
+def execute_preproc_pipeline(df, pipeline_path, string_columns = ["periodOrig", "weekDay", "route"],
                             features=["busStopIdOrig", "busStopIdDest", "shapeLatOrig", "shapeLonOrig", "shapeLatDest", "shapeLonDest", "hourOrig",
                              "isRushOrig", "isHoliday", "isWeekend", "isRegularDay", "distance", "month", "weekOfYear", "dayOfMonth"]):
-
     pipelineStages = []
 
-    indexers = [StringIndexer(inputCol = column, outputCol = column + "_index") for column in string_columns]
+    coordinatesFeatures = ["shapeLatOrig", "shapeLonOrig", "shapeLatDest", "shapeLonDest"]
 
-    assembler = VectorAssembler(
-        inputCols = features + map(lambda c: c + "_index", string_columns),
-        outputCol = 'features')
+    # Assemble a vector with coordinates that will be the input of the scaler
+    scalerVectorAssembler = VectorAssembler(inputCols=coordinatesFeatures,
+                                  outputCol="coordinates")
+    # Normalize the scale of coordinates
+    coordinatesScaler = MinMaxScaler(inputCol="coordinates", outputCol="scaledCoordinates")
 
-    pipelineStages = pipelineStages + indexers
-    pipelineStages.append(assembler)
+    pipelineStages.append(scalerVectorAssembler)
+    pipelineStages.append(coordinatesScaler)
 
+    # Add _index to categorical variables
+    for column in string_columns:
+        indexer = StringIndexer(inputCol = column, outputCol = column + "_index")
+        pipelineStages.append(indexer)
+    # Assemble a vector with all the features that will be the input of the model
+    featuresAssembler = VectorAssembler(
+            inputCols = features + map(lambda c: c + "_index" if c not in coordinatesFeatures, string_columns),
+            outputCol = 'features')
+
+    pipelineStages.append(featuresAssembler)
+    item_list = [e for e in features if e not in coordinatesFeatures]
     pipeline = Pipeline(stages = pipelineStages)
+    pipelineModel =  pipeline.fit(df)
+    pipelineModel.write().overwrite().save(pipeline_path)
+    df = pipelineModel.transform(df)
 
-    return pipeline
+    return df
 
 def is_train_or_test(month, dayOfMonth, train_start_date, train_end_date, test_end_date):
     if month >=  train_start_date.month & dayOfMonth >= train_start_date.day & month <= train_end_date.month & dayOfMonth <= train_end_date.day:
@@ -176,7 +220,8 @@ if __name__ == "__main__":
         print "Error: Wrong parameter specification!"
         print "Your command should be something like:"
         print "spark-submit %s <training-data-path> <train-start-date(YYYY-MM-DD)> " \
-              "<train-end-date(YYYY-MM-DD)> <test-end-date(YYYY-MM-DD)> <tunning-info-path>" % (sys.argv[0])
+              "<train-end-date(YYYY-MM-DD)> <test-end-date(YYYY-MM-DD)> <tunning-info-path>"\
+              "<pipeline_path>" % (sys.argv[0])
         sys.exit(1)
 
     training_data_path = sys.argv[1]
@@ -184,6 +229,7 @@ if __name__ == "__main__":
     train_end_date = sys.argv[3]
     test_end_date = sys.argv[4]
     filepath = sys.argv[5]
+    pipeline_path = sys.argv[6]
 
     sc = SparkContext(appName="tunning_btr_2.0")
     global sqlContext
@@ -191,29 +237,28 @@ if __name__ == "__main__":
 
     raw_data = read_data(training_data_path)
 
-    pipeline = build_features_pipeline(features=["busStopIdOrig", "busStopIdDest", "hourOrig",
+    transformed_data = execute_preproc_pipeline(raw_data, pipeline_path, features=["busStopIdOrig", "busStopIdDest", "hourOrig",
                              "isRushOrig", "weekOfYear", "dayOfMonth", "month", "isHoliday", "isWeekend", "isRegularDay", "distance"])
-
-    transformed_data = pipeline.fit(raw_data).transform(raw_data)
 
     train_data = transformed_data.filter("date > '" + train_start_date + "' and date < '" + train_end_date + "'")
 
     test_data = transformed_data.filter("date > '" + train_end_date + "' and date < '" + test_end_date + "'")
 
-
     #train_data = split_partitions(train_data, train_start_date, train_end_date, test_end_date)
 
     duration = "duration"
     crowdedness = "probableNumPassengers"
+    pacing = "pacing"
+    speed = "speed"
 
     # Lasso
-    duration_lasso_model = train_lasso(train_data, test_data, duration, filepath)
+    duration_lasso_model = train_lasso(train_data, test_data, speed, filepath)
     # pass_lasso_model = train_lasso(train_data, test_data, crowdedness, filepath)
 
     # Random Forest
-    duration_rf_model = train_rf(train_data, test_data, duration, filepath)
+    # duration_rf_model = train_rf(train_data, test_data, duration, filepath)
     # pass_rf_model = train_rf(train_data, test_data, crowdedness, filepath)
 
     # Gradient Boosted Trees
-    duration_gbt_model = train_gbt(train_data, test_data, duration, filepath)
+    # duration_gbt_model = train_gbt(train_data, test_data, duration, filepath)
     # pass_gbt_model = train_gbt(train_data, test_data, crowdedness, filepath)
