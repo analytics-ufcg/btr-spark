@@ -237,11 +237,11 @@ def get_normal_distribution_list(mu, sigma, l_size):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 5:
+    if len(sys.argv) != 5:
         print "Error! Your command must be something like:"
         print "spark-submit %s <btr-input-path> " \
               "<btr-pre-processing-output-folder> <initial-date(YYYY-MM-DD)> " \
-              "<final-date(YYYY-MM-DD)> <btr-outliers-output>" % (sys.argv[0])
+              "<final-date(YYYY-MM-DD)>" % (sys.argv[0])
         sys.exit(1)
 
     btr_input_path = sys.argv[1]
@@ -249,10 +249,10 @@ if __name__ == "__main__":
     initial_date = datetime.strptime(sys.argv[3], '%Y-%m-%d')
     final_date = datetime.strptime(sys.argv[4], '%Y-%m-%d')
 
-    btr_pre_processing_data_path = btr_pre_processing_output_path + "train_data"    
+    btr_pre_processing_data_path = btr_pre_processing_output_path + "train_data"
     routes_stops_output_path = btr_pre_processing_output_path + "routes_stops"
     btr_outliers_output = btr_pre_processing_output_path + "outliers"
-    
+
     sc = SparkContext(appName="btr_pre_processing")
     sqlContext = pyspark.SQLContext(sc)
 
