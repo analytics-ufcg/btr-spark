@@ -26,8 +26,10 @@ def execute_preproc_pipeline(df, pipeline_path, string_columns = ["periodOrig", 
                              "isRushOrig", "isHoliday", "isWeekend", "isRegularDay", "distance", "month", "weekOfYear", "dayOfMonth"]):
     pipelineStages = []
 
+    coordinatesFeatures = ["shapeLatOrig", "shapeLonOrig", "shapeLatDest", "shapeLonDest"]
+
     # Assemble a vector with coordinates that will be the input of the scaler
-    scalerVectorAssembler = VectorAssembler(inputCols=["shapeLatOrig", "shapeLonOrig", "shapeLatDest", "shapeLonDest"],
+    scalerVectorAssembler = VectorAssembler(inputCols=coordinatesFeatures,
                                   outputCol="coordinates")
     # Normalize the scale of coordinates
     coordinatesScaler = MinMaxScaler(inputCol="coordinates", outputCol="scaledCoordinates")
@@ -39,6 +41,9 @@ def execute_preproc_pipeline(df, pipeline_path, string_columns = ["periodOrig", 
     for column in string_columns:
         indexer = StringIndexer(inputCol = column, outputCol = column + "_index")
         pipelineStages.append(indexer)
+
+    features = [f for f in features if f not in coordinatesFeatures]
+    features.append('scaledCoordinates')
     # Assemble a vector with all the features that will be the input of the model
     featuresAssembler = VectorAssembler(
             inputCols = features + map(lambda c: c + "_index", string_columns),
@@ -114,7 +119,6 @@ if __name__ == "__main__":
     crowdedness_model_path_to_save = output_folder_path + "crowdedness-model/"
     pipeline_path = output_folder_path + "pipeline/"
     train_info_path = output_folder_path + "train-info/"
-
 
     sc = SparkContext(appName="train_btr_2.0")
     sqlContext = pyspark.SQLContext(sc)
