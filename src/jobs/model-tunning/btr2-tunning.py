@@ -25,7 +25,7 @@ def train_lasso(train_data, test_data, label, file_to_save):
     crossval = CrossValidator(estimator=duration_lr,
                               estimatorParamMaps=paramGrid,
                               evaluator=RegressionEvaluator(labelCol=label),
-                              numFolds=2)
+                              numFolds=5)
 
     cvModel = crossval.fit(train_data)
 
@@ -88,7 +88,7 @@ def train_gbt(train_data, test_data, label, file_to_save):
     crossval = CrossValidator(estimator=duration_gbt,
                         estimatorParamMaps=paramGrid,
                         evaluator=RegressionEvaluator(labelCol=label),
-                        numFolds=2)
+                        numFolds=5)
 
     cvModel = crossval.fit(train_data)
 
@@ -254,14 +254,17 @@ if __name__ == "__main__":
     # duration_lasso_model = train_lasso(train_data, test_data, pacing, output_path)
     # pass_lasso_model = train_lasso(train_data, test_data, crowdedness, output_path)
     pacing_lasso_model = train_lasso(transformed_data, transformed_data, duration, output_path)
+    speed_lasso_model = train_lasso(transformed_data, transformed_data, speed, output_path)
 
 
     # Random Forest
     # duration_rf_model = train_rf(train_data, test_data, duration, output_path)
     # pass_rf_model = train_rf(train_data, test_data, crowdedness, output_path)
-    # pacing_rf_model = train_rf(train_data, test_data, pacing, output_path)
+    pacing_rf_model = train_rf(train_data, test_data, pacing, output_path)
+    speed_rf_model = train_rf(train_data, test_data, speed, output_path)
 
     # Gradient Boosted Trees
     # duration_gbt_model = train_gbt(train_data, test_data, duration, output_path)
     # pass_gbt_model = train_gbt(train_data, test_data, crowdedness, output_path)
-    # pacing_gbt_model = train_gbt(train_data, test_data, pacing, output_path)
+    pacing_gbt_model = train_gbt(train_data, test_data, pacing, output_path)
+    speed_gbt_model = train_gbt(train_data, test_data, speed, output_path)
