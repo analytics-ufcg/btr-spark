@@ -141,10 +141,10 @@ if __name__ == "__main__":
     btr_input_path = sys.argv[1]
     btr_pre_processing_output_path = sys.argv[2]
 
-    btr_pre_processing_data_path = btr_pre_processing_output_path + "train_data"    
+    btr_pre_processing_data_path = btr_pre_processing_output_path + "train_data"
     routes_stops_output_path = btr_pre_processing_output_path + "routes_stops"
     btr_outliers_output = btr_pre_processing_output_path + "outliers"
-    
+
     sc = SparkContext(appName="btr_pre_processing")
     sqlContext = pyspark.SQLContext(sc)
 
