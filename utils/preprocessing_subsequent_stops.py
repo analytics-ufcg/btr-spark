@@ -2,8 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import sys
-from glob import glob
-from os.path import isfile, join, splitext
 import os
 os.environ["PYSPARK_PYTHON"] = "python2.7"
 from pyspark.ml.feature import StringIndexer
@@ -16,81 +14,13 @@ import pyspark.sql.functions as func
 from pyspark.sql.window import Window
 from pyspark.sql.types import StructType, StructField, DoubleType, StringType, IntegerType
 
-from datetime import datetime
-
-import build_od_matrix as odm
-
 import random
 
-def read_file(filepath, sqlContext):
-    data_frame = sqlContext.read.csv(filepath, header=True, inferSchema=True, nullValue="-")
-
-    while len(data_frame.columns) < 16:
-        col_name = "_c" + str(len(data_frame.columns))
-        data_frame = data_frame.withColumn(col_name, lit(None))
-
-    data_frame = rename_columns(
-        data_frame,
-        [
-    #         ("_c0", "route"),
-    #         ("_c1", "tripNum"),
-    #         ("_c2", "shapeId"),
-    #         ("_c3", "shapeSequence"),
-    #         ("_c4", "shapeLat"),
-    #         ("_c5", "shapeLon"),
-    #         ("_c6", "distanceTraveledShape"),
-    #         ("_c7", "busCode"),
-    #         ("_c8", "gpsPointId"),
-    #         ("_c9", "gpsLat"),
-    #         ("_c10", "gpsLon"),
-    #         ("_c11", "distanceToShapePoint"),
-    #         ("_c12", "timestamp"),
-            ("stopPointId", "busStopId")
-    #         ("_c14", "problem"),
-    #         ("_c15", "numPassengers")
-        ]
-    )
-
-    date = "-".join(filepath.split("/")[-2].split("_")[:3])
-
-    data_frame = data_frame.withColumn("date", lit(date))
-
+def read_buste_data(filepath, sqlContext):
+    data_frame = sqlContext.read.csv(filepath, header=True, inferSchema=True,nullValue="-")
+    data_frame = data_frame.withColumn("date", data_frame.date.cast('String'))
+    data_frame = data_frame.withColumnRenamed('stopPointId', 'busStopId')
     return data_frame
-
-def read_files(path, sqlContext, sc, initial_date, final_date):
-    extension = splitext(path)[1]
-
-    if extension == "":
-        path_pattern = path + "/*/part-*"
-        if "hdfs" in path:
-            URI = sc._gateway.jvm.java.net.URI
-            Path = sc._gateway.jvm.org.apache.hadoop.fs.Path
-            FileSystem = sc._gateway.jvm.org.apache.hadoop.fs.FileSystem
-            Configuration = sc._gateway.jvm.org.apache.hadoop.conf.Configuration
-
-            hdfs = "/".join(path_pattern.split("/")[:3])
-            dir = "/" + "/".join(path_pattern.split("/")[3:])
-
-            fs = FileSystem.get(URI(hdfs), Configuration())
-
-            status = fs.globStatus(Path(dir))
-
-            files = map(lambda file_status: str(file_status.getPath()), status)
-
-        else:
-            files = glob(path_pattern)
-
-        print files
-
-        files = filter(lambda f: initial_date <= datetime.strptime(f.split("/")[-2], '%Y_%m_%d_veiculos') <=
-                                 final_date, files)
-
-        print files
-
-        return reduce(lambda df1, df2: df1.unionAll(df2),
-                      map(lambda f: read_file(f, sqlContext), files))
-    else:
-        return read_file(path, sqlContext)
 
 def add_columns_lead(df, list_of_tuples, window):
     """
@@ -108,25 +38,6 @@ def add_columns_lead(df, list_of_tuples, window):
 
     for (old_col, new_col) in list_of_tuples:
         df = df.withColumn(new_col, lead(old_col).over(window))
-
-    return df
-
-def add_accumulated_passengers(df, window, probs = [0.025, 0.025, 0.05, 0.06, 0.075, 0.08, 0.11, 0.15, 0.11, 0.08, 0.075, 0.06, 0.05, 0.025, 0.025]):
-    """
-    :param df: Spark DataFrame
-    :param window: Spark Window to iterate over
-    :return: Spark DataFrame with accumulated number of passengers
-    """
-
-    df = df.withColumn("acumPassengers", func.sum(df.numPassengers).over(window))
-
-    df = df.withColumn("probableNumPassengers", lit(0))
-    for i in range(len(probs)):
-        df = df.withColumn("probableNumPassengers", df.probableNumPassengers - lag(df.numPassengers, count=i + 1, default=0).over(window) * probs[i])
-
-    df = df.withColumn("probableNumPassengers", df.numPassengers + df.probableNumPassengers)
-    df = df.withColumn("probableNumPassengers", func.sum(df.probableNumPassengers).over(window))
-    df = df.withColumn("probableNumPassengers", when(df.probableNumPassengers >= 0, df.probableNumPassengers).otherwise(0))
 
     return df
 
@@ -220,34 +131,15 @@ def extract_routes_stops(df, routes_stops_output_path):
 
     unique_stops_df.write.csv(routes_stops_output_path, mode="overwrite", header=True)
 
-def get_normal_distribution_list(mu, sigma, l_size):
-    dist = list()
-    for i in range(l_size):
-        dist.append(random.gauss(mu, sigma))
-    dist_sum = sum(dist)
-    norm_dist = map(lambda v: v / dist_sum, dist)
-    norm_dist.sort()
-    norm_dist_sorted = [0] * l_size
-    for i in range(l_size):
-        if i % 2 == 0:
-            norm_dist_sorted[i/2] = norm_dist[i]
-        else:
-            norm_dist_sorted[-1 * (i + 1) / 2] = norm_dist[i]
-    return norm_dist_sorted
-
-
 if __name__ == "__main__":
-    if len(sys.argv) != 5:
+    if len(sys.argv) < 3:
         print "Error! Your command must be something like:"
         print "spark-submit %s <btr-input-path> " \
-              "<btr-pre-processing-output-folder> <initial-date(YYYY-MM-DD)> " \
-              "<final-date(YYYY-MM-DD)>" % (sys.argv[0])
+              "<btr-pre-processing-output-folder>" % (sys.argv[0])
         sys.exit(1)
 
     btr_input_path = sys.argv[1]
     btr_pre_processing_output_path = sys.argv[2]
-    initial_date = datetime.strptime(sys.argv[3], '%Y-%m-%d')
-    final_date = datetime.strptime(sys.argv[4], '%Y-%m-%d')
 
     btr_pre_processing_data_path = btr_pre_processing_output_path + "train_data"
     routes_stops_output_path = btr_pre_processing_output_path + "routes_stops"
@@ -256,15 +148,11 @@ if __name__ == "__main__":
     sc = SparkContext(appName="btr_pre_processing")
     sqlContext = pyspark.SQLContext(sc)
 
-    trips_df = read_files(btr_input_path, sqlContext, sc, initial_date, final_date)
-
-    trips_df = odm.buildODMatrix(trips_df)
+    trips_df = read_buste_data(btr_input_path, sqlContext)
 
     stops_df = trips_df.na.drop(subset=["busStopId"])
 
     extract_routes_stops(stops_df, routes_stops_output_path)
-
-    print stops_df.printSchema
 
     w = Window().partitionBy("date", "route", "shapeId", "busCode", "tripNum").orderBy("timestamp")
 
@@ -281,13 +169,6 @@ if __name__ == "__main__":
         w
     )
 
-
-
-    # stops_df_lead = add_accumulated_passengers(
-    #     stops_df_lead,
-    #     w,
-    #     probs=get_normal_distribution_list(40, 10, 66)
-    # )
 
     stops_df_lead = rename_columns(
         stops_df_lead,
@@ -306,6 +187,8 @@ if __name__ == "__main__":
     print stops_df.show(10)
 
     print stops_df_lead.show(10)
+    print stops_df.printSchema()
+    print stops_df_lead.printSchema()
 
     stops_df_lead = extract_features(stops_df_lead)
 
