@@ -7,7 +7,7 @@ from pyspark.mllib.evaluation import RegressionMetrics
 from pyspark.sql.types import StringType
 
 # MLlib
-from pyspark.ml.regression import LinearRegressionModel, LinearRegression
+from pyspark.ml.regression import LinearRegressionModel, LinearRegression, RandomForestRegressor, GBTRegressor
 
 import sys
 import os
@@ -60,26 +60,28 @@ def execute_preproc_pipeline(df, pipeline_path, string_columns = ["periodOrig", 
 
 def train_duration_model(training_df):
     duration_lr = LinearRegression(maxIter=10, regParam=0.01, elasticNetParam=1.0).setLabelCol("duration").setFeaturesCol("features")
-
     duration_lr_model = duration_lr.fit(training_df)
-
     return duration_lr_model
 
 def train_crowdedness_model(training_df):
     crowdedness_lr = LinearRegression(maxIter=10, regParam=0.01, elasticNetParam=1.0).setLabelCol("crowdedness").setFeaturesCol("features")
-
     crowdedness_lr_model = crowdedness_lr.fit(training_df)
-
     return crowdedness_lr_model
 
+def train_pacing_model(training_df):
+    pacing_regressor = GBTRegressor(maxDepth = 4, maxBins = 300).setLabelCol("pacing").setFeaturesCol("features")
+    pacing_model = pacing_regressor.fit(training_df)
+    return pacing_model
+
+def train_speed_model(training_df):
+    speed_regressor = LinearRegression(maxIter=10, regParam=0.01, elasticNetParam=1.0).setLabelCol("speed").setFeaturesCol("features")
+    speed_model = speed_regressor.fit(training_df)
+    return speed_model
 
 def getPredictionsLabels(model, test_data):
     predictions = model.transform(test_data)
-
     trainingSummary = RegressionMetrics(predictions.rdd.map(lambda row: (row.prediction, row.duration)))
-
     return (predictions, trainingSummary)
-
 
 def save_train_info(model, test_data, model_name, filepath):
     predictions, trainingSummary = getPredictionsLabels(model, test_data)
@@ -117,6 +119,8 @@ if __name__ == "__main__":
     output_folder_path = sys.argv[2]
     duration_model_path_to_save = output_folder_path + "duration-model/"
     crowdedness_model_path_to_save = output_folder_path + "crowdedness-model/"
+    pacing_model_path_to_save = output_folder_path + "pacing-model/"
+    speed_model_path_to_save = output_folder_path + "speed-model/"
     pipeline_path = output_folder_path + "pipeline/"
     train_info_path = output_folder_path + "train-info/"
 
@@ -132,12 +136,19 @@ if __name__ == "__main__":
     duration_model = train_duration_model(train)
     # Crowdedness
     crowdedness_model = train_crowdedness_model(train.na.drop(subset=["crowdedness"]))
+    # Pacing
+    pacing_model = train_pacing_model(train.na.drop(subset=["pacing"]))
+    # Speed
+    speed_model = train_speed_model(train.na.drop(subset=["speed"]))
 
     save_train_info(duration_model, test, "duration", train_info_path)
     save_train_info(crowdedness_model, test.na.drop(subset=["crowdedness"]), "crowdedness", train_info_path)
+    save_train_info(pacing_model, test, "pacing", train_info_path)
+    save_train_info(speed_model, test, "speed", train_info_path)
 
     save_model(duration_model, duration_model_path_to_save)
     save_model(crowdedness_model, crowdedness_model_path_to_save)
-
+    save_model(pacing_model, pacing_model_path_to_save)
+    save_model(speed_model, speed_model_path_to_save)
 
     sc.stop()
