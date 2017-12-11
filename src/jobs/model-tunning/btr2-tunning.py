@@ -33,7 +33,10 @@ def train_lasso(train_data, test_data, label, file_to_save):
     regParam = bestModel._java_obj.getRegParam()
     maxIter = bestModel._java_obj.getMaxIter()
 
-    with open(params_folder_path + 'lassoParams.csv','wb') as file:
+    lasso_params_folder_path = params_folder_path + 'lasso/'
+    if not os.path.exists(lasso_params_folder_path):
+        os.makedirs(lasso_params_folder_path)
+    with open(lasso_params_folder_path + label + 'Params.csv','wb') as file:
         file.write("param, value" + '\n')
         file.write("maxIter, " + str(maxIter) + '\n')
         file.write("regParam, " + str(regParam) + '\n')
@@ -65,7 +68,10 @@ def train_rf(train_data, test_data, label, file_to_save):
     maxBins = bestModel._java_obj.getMaxBins()
     numTrees = bestModel._java_obj.getNumTrees()
 
-    with open(params_folder_path + 'randomForestParams.csv','wb') as file:
+    rf_params_folder_path = params_folder_path + 'randomForest/'
+    if not os.path.exists(rf_params_folder_path):
+        os.makedirs(rf_params_folder_path)
+    with open(rf_params_folder_path + label + 'Params.csv','wb') as file:
         file.write("param, value" + '\n')
         file.write("maxDepth, " + str(maxDepth) + '\n')
         file.write("maxBins, " + str(maxBins) + '\n')
@@ -96,7 +102,10 @@ def train_gbt(train_data, test_data, label, file_to_save):
     maxDepth = bestModel._java_obj.getMaxDepth()
     maxBins = bestModel._java_obj.getMaxBins()
 
-    with open(params_folder_path + 'GBTParams.csv','wb') as file:
+    gbt_params_folder_path = params_folder_path + 'GBT/'
+    if not os.path.exists(gbt_params_folder_path):
+        os.makedirs(gbt_params_folder_path)
+    with open(gbt_params_folder_path + label + 'Params.csv','wb') as file:
         file.write("param, value" + '\n')
         file.write("maxDepth, " + str(maxDepth) + '\n')
         file.write("maxBins, " + str(maxBins) + '\n')
