@@ -47,6 +47,32 @@ def read_files(path, sqlContext, sc, initial_date, final_date):
     else:
         return read_file(path, sqlContext)
 
+def get_files(path, sqlContext, sc, initial_date, final_date):
+
+	path_pattern = path + "/*"
+	if "hdfs" in path:
+		URI = sc._gateway.jvm.java.net.URI
+		Path = sc._gateway.jvm.org.apache.hadoop.fs.Path
+		FileSystem = sc._gateway.jvm.org.apache.hadoop.fs.FileSystem
+		Configuration = sc._gateway.jvm.org.apache.hadoop.conf.Configuration
+
+		hdfs = "/".join(path_pattern.split("/")[:3])
+		dir = "/" + "/".join(path_pattern.split("/")[3:])
+
+		fs = FileSystem.get(URI(hdfs), Configuration())
+
+		status = fs.globStatus(Path(dir))
+
+		files = map(lambda file_status: str(file_status.getPath()), status)
+
+	else:
+		files = glob(path_pattern)
+
+	files = filter(lambda f: initial_date <= datetime.strptime(f.split("/")[-1], '%Y_%m_%d_veiculos') <=
+                                 final_date, files)
+
+	return files
+
 def rename_columns(df, list_of_tuples):
     for (old_col, new_col) in list_of_tuples:
         df = df.withColumnRenamed(old_col, new_col)
@@ -75,7 +101,7 @@ def dist(lat_x, long_x, lat_y, long_y):
     ) * F.lit(6371.0)
 
 
-def buildODMatrix(buste_data, datapath):
+def buildODMatrix(buste_data, datapath, filepath):
 
 	# buste_data = read_files(sqlContext, datapath + "/2017_06_21_veiculos/")
 
@@ -161,6 +187,8 @@ def buildODMatrix(buste_data, datapath):
 	                            .filter('dist <= 1.0') \
 	                            .filter(user_trips_data.cardNum.isNotNull())
 
+	#filtered_od_matrix.write.csv(path=tmppath+'/od/filtered_od',header=True, mode='append')
+
 	trips_origins = filtered_od_matrix \
 	                            .select(['o_date','o_route','o_bus_code','o_tripNum','o_stop_id','o_timestamp']) \
 	                            .groupBy(['o_date','o_route','o_bus_code','o_tripNum','o_stop_id']) \
@@ -179,11 +207,11 @@ def buildODMatrix(buste_data, datapath):
 	                            .count() \
                                 .withColumnRenamed('count','alighting_cnt') 
 
-	trips_origins.write.csv(path=datapath+'/od/trips_origins',header=True, mode='overwrite')
-	trips_destinations.write.csv(path=datapath+'/od/trips_destinations',header=True, mode='overwrite')
+	trips_origins.write.csv(path=datapath+'/od/trips_origins/' + filepath,header=True, mode='overwrite')
+	trips_destinations.write.csv(path=datapath+'/od/trips_destinations' + filepath,header=True, mode='overwrite')
 
-	trips_o = sqlContext.read.csv(datapath+'/od/trips_origins', header=True,inferSchema=True,nullValue="-")
-	trips_d = sqlContext.read.csv(datapath+'/od/trips_destinations', header=True,inferSchema=True,nullValue="-")
+	trips_o = sqlContext.read.csv(datapath + '/od/trips_origins' + filepath, header=True,inferSchema=True,nullValue="-")
+	trips_d = sqlContext.read.csv(datapath + '/od/trips_destinations' + filepath, header=True,inferSchema=True,nullValue="-")
 
 	trips_passengers = trips_o.join(trips_d, on = ['date','route','busCode','tripNum','stopPointId'], how='outer')
 
@@ -208,9 +236,19 @@ def buildODMatrix(buste_data, datapath):
 	                        .withColumn('ext_num_pass', F.col('num_pass')*F.col('extrap_factor'))
 
 
-	buste_crowdedness_extrapolated.write.csv(path=datapath+'/od/buste_crowdedness/',header=True, mode='overwrite')
+	buste_crowdedness_extrapolated.write.csv(path=datapath + '/od/buste_crowdedness/' + filepath,header=True, mode='overwrite')
 
 	# return buste_crowdedness_extrapolated
+
+
+def execute_job(input_folder, sqlContext, sc, initial_date, final_date):
+
+	files = get_files(input_folder, sqlContext, sc, initial_date, final_date)
+
+	for file in files:
+		data = read_buste_data_v3(file, sqlContext)
+
+		buildODMatrix(data, output_folder, file)
 
 if __name__ == "__main__":
     if len(sys.argv) < 5:
@@ -230,8 +268,6 @@ if __name__ == "__main__":
     sc = SparkContext(appName="OD matrix Builder")
     sqlContext = pyspark.SQLContext(sc)
 
-    data = read_files(input_folder, sqlContext, sc, initial_date, final_date)
-    
-    buildODMatrix(data, output_folder)
+    execute_job(input_folder, sqlContext, sc, initial_date, final_date)
 
     sc.stop()
