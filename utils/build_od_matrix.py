@@ -229,9 +229,7 @@ def buildODMatrix(buste_data, datapath, filepath):
     .drop('overall_boarding','odmatrix_boarding') \
     .withColumn('ext_num_pass', F.col('num_pass')*F.col('extrap_factor'))
 
-    buste_crowdedness_extrapolated.write.csv(path=datapath + '/od/buste_crowdedness/' + filepath,header=True, mode='overwrite')
-
-    # return buste_crowdedness_extrapolated
+    return buste_crowdedness_extrapolated
 
 
 def execute_job(input_folder, sqlContext, sc, initial_date, final_date):
@@ -241,7 +239,9 @@ def execute_job(input_folder, sqlContext, sc, initial_date, final_date):
     for file in files:
         data = read_buste_data_v3(file, sqlContext)
         dailyFile = file.split("/")[-1]
-        buildODMatrix(data, output_folder, dailyFile)
+        result = buildODMatrix(data, output_folder, dailyFile)
+        result.write.csv(path=output_folder + '/od/buste_crowdedness/',header=True, mode='append')
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 5:
