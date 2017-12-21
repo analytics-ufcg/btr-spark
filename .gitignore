@@ -12,3 +12,7 @@ analise/.Rproj.user
 analise/.Rhistory
 analise/dadostratados.csv
 .Rproj.user
+derby.log
+metastore_db/
+src/jobs/model-tunning/tuning-analysis.R
+*.pyc
