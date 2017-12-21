@@ -12,13 +12,14 @@ from pyspark import SparkContext
 from pyspark.sql.functions import lit, lead, lag, udf, unix_timestamp, hour, when, weekofyear, date_format, dayofmonth, month
 import pyspark.sql.functions as func
 from pyspark.sql.window import Window
-from pyspark.sql.types import StructType, StructField, DoubleType, StringType, IntegerType
+from pyspark.sql.types import StructType, StructField, DoubleType, StringType, IntegerType, DateType
 
 import random
 
 def read_buste_data(filepath, sqlContext):
     data_frame = sqlContext.read.csv(filepath, header=True, inferSchema=True,nullValue="-")
-    data_frame = data_frame.withColumn("date", data_frame.date.cast('String'))
+    data_frame = data_frame.withColumn("date", data_frame.date.cast('timestamp'))
+    data_frame = data_frame.withColumn("date", data_frame.date.cast(DateType()))
     data_frame = data_frame.withColumnRenamed('stopPointId', 'busStopId')
     return data_frame
 
@@ -183,12 +184,6 @@ if __name__ == "__main__":
     )
 
     stops_df_lead = stops_df_lead.na.drop(subset=["busStopIdDest"])
-
-    print stops_df.show(10)
-
-    print stops_df_lead.show(10)
-    print stops_df.printSchema()
-    print stops_df_lead.printSchema()
 
     stops_df_lead = extract_features(stops_df_lead)
 
