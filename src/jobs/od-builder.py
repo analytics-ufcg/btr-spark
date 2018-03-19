@@ -78,19 +78,10 @@ def rename_columns(df, list_of_tuples):
         df = df.withColumnRenamed(old_col, new_col)
     return df
 
-def read_hdfs_folder(sqlContext, folderpath):
-	data_frame = sqlContext.read.csv(folderpath, header=True, inferSchema=True, nullValue="-")
-	data_frame = rename_columns(data_frame, [("cardNum18", "cardNum"), ("cardNum19", "userGender"),])
-	date = "-".join(folderpath.split("/")[-2].split("_")[:3])
-	data_frame = data_frame.withColumn("date", F.lit(date))
-	data_frame = data_frame.withColumn("date", F.date_sub(F.col("date"),1))
-	return data_frame
-
 def read_buste_data_v3( filepath, sqlContext):
     data_frame = sqlContext.read.csv(filepath, header=True, inferSchema=True,nullValue="-")
     date = "-".join(filepath.split("/")[-1].split("_")[:3])
-    data_frame = data_frame.withColumn("date", F.lit(date))
-    data_frame = data_frame.withColumn("date", F.unix_timestamp(F.date_sub(F.col("date"),1),'yyyy-MM-dd'))
+    data_frame = data_frame.withColumn("date", F.unix_timestamp(F.col("date"),'yyyy_MM_dd'))
     return data_frame
 
 def dist(lat_x, long_x, lat_y, long_y):
@@ -184,6 +175,8 @@ def buildODMatrix(buste_data, datapath, filepath):
     .filter('dist <= 1.0') \
     .filter(user_trips_data.cardNum.isNotNull())
 
+    filtered_od_matrix.write.csv(path=datapath+'od/filtered_od/' + filepath,header=True, mode='overwrite')
+
     trips_origins = filtered_od_matrix \
     .select(['o_date','o_route','o_bus_code','o_tripNum','o_stop_id','o_timestamp']) \
     .groupBy(['o_date','o_route','o_bus_code','o_tripNum','o_stop_id']) \
@@ -204,10 +197,10 @@ def buildODMatrix(buste_data, datapath, filepath):
     trips_origins.write.csv(path=datapath+'od/trips_origins/' + filepath,header=True, mode='overwrite')
     trips_destinations.write.csv(path=datapath+'od/trips_destinations/' + filepath,header=True, mode='overwrite')
 
-    trips_o = sqlContext.read.csv(datapath + 'od/trips_origins/' + filepath, header=True,inferSchema=True,nullValue="-")
-    trips_d = sqlContext.read.csv(datapath + 'od/trips_destinations/' + filepath, header=True,inferSchema=True,nullValue="-")
+    #trips_o = sqlContext.read.csv(datapath + 'od/trips_origins/' + filepath, header=True,inferSchema=True,nullValue="-")
+    #trips_d = sqlContext.read.csv(datapath + 'od/trips_destinations/' + filepath, header=True,inferSchema=True,nullValue="-")
 
-    trips_passengers = trips_o.join(trips_d, on = ['date','route','busCode','tripNum','stopPointId'], how='outer')
+    trips_passengers = trips_origins.join(trips_destinations, on = ['date','route','busCode','tripNum','stopPointId'], how='outer')
 
     trips_window = Window.partitionBy(['date','route','busCode','tripNum']).orderBy('timestamp')
 
