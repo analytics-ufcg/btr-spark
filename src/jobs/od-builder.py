@@ -92,7 +92,7 @@ def dist(lat_x, long_x, lat_y, long_y):
     ) * F.lit(6371.0)
 
 
-def buildODMatrix(buste_data, datapath, filepath):
+def buildODMatrix(buste_data, datapath, file_name):
 
     clean_buste_data = buste_data.na.drop(subset=["date","route","busCode","tripNum","stopPointId","timestamp","shapeLon","shapeLat"])
 
@@ -175,7 +175,7 @@ def buildODMatrix(buste_data, datapath, filepath):
     .filter('dist <= 1.0') \
     .filter(user_trips_data.cardNum.isNotNull())
 
-    filtered_od_matrix.write.csv(path=datapath+'od/filtered_od/' + filepath,header=True, mode='overwrite')
+    filtered_od_matrix.write.csv(path=datapath+'od/trips_od/' + file_name + '_od',header=True, mode='overwrite')
 
     trips_origins = filtered_od_matrix \
     .select(['o_date','o_route','o_bus_code','o_tripNum','o_stop_id','o_timestamp']) \
@@ -194,11 +194,11 @@ def buildODMatrix(buste_data, datapath, filepath):
     .count() \
     .withColumnRenamed('count','alighting_cnt')
 
-    trips_origins.write.csv(path=datapath+'od/trips_origins/' + filepath,header=True, mode='overwrite')
-    trips_destinations.write.csv(path=datapath+'od/trips_destinations/' + filepath,header=True, mode='overwrite')
+    trips_origins.write.csv(path=datapath+'od/trips_origins/' + file_name + '_to',header=True, mode='overwrite')
+    trips_destinations.write.csv(path=datapath+'od/trips_destinations/' + file_name + '_td',header=True, mode='overwrite')
 
-    #trips_o = sqlContext.read.csv(datapath + 'od/trips_origins/' + filepath, header=True,inferSchema=True,nullValue="-")
-    #trips_d = sqlContext.read.csv(datapath + 'od/trips_destinations/' + filepath, header=True,inferSchema=True,nullValue="-")
+    #trips_o = sqlContext.read.csv(datapath + 'od/trips_origins/' + file_name, header=True,inferSchema=True,nullValue="-")
+    #trips_d = sqlContext.read.csv(datapath + 'od/trips_destinations/' + file_name, header=True,inferSchema=True,nullValue="-")
 
     trips_passengers = trips_origins.join(trips_destinations, on = ['date','route','busCode','tripNum','stopPointId'], how='outer')
 
@@ -231,9 +231,9 @@ def execute_job(input_folder, sqlContext, sc, initial_date, final_date):
 
     for file in files:
         data = read_buste_data_v3(file, sqlContext)
-        dailyFile = file.split("/")[-1]
-        result = buildODMatrix(data, output_folder, dailyFile)
-        result.write.csv(path=output_folder + '/od/buste_crowdedness/',header=True, mode='append')
+        file_date = file.split("/")[-1].replace('_veiculos','')
+        result = buildODMatrix(data, output_folder, file_date)
+        result.write.csv(path=output_folder + '/od/buste_crowdedness/' + file_date + '_bc',header=True, mode='append')
 
 
 if __name__ == "__main__":
