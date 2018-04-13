@@ -37,7 +37,7 @@ def read_files(path, sqlContext, sc, initial_date, final_date):
 
         print files
 
-        files = filter(lambda f: initial_date <= datetime.strptime(f.split("/")[-2], '%Y_%m_%d_veiculos') <=
+        files = filter(lambda f: initial_date <= datetime.strptime(f.split("/")[-2], '%Y_%m_%d') <=
                                  final_date, files)
 
         print files
@@ -68,7 +68,7 @@ def get_files(path, sqlContext, sc, initial_date, final_date):
     else:
         files = glob(path_pattern)
 
-    files = filter(lambda f: initial_date <= datetime.strptime(f.split("/")[-1], '%Y_%m_%d_veiculos') <=
+    files = filter(lambda f: initial_date <= datetime.strptime(f.split("/")[-1], '%Y_%m_%d') <=
     final_date, files)
 
     return files
@@ -231,7 +231,7 @@ def execute_job(input_folder, sqlContext, sc, initial_date, final_date):
 
     for file in files:
         data = read_buste_data_v3(file, sqlContext)
-        file_date = file.split("/")[-1].replace('_veiculos','')
+        file_date = file.split("/")[-1]
         result = buildODMatrix(data, output_folder, file_date)
         result.write.csv(path=output_folder + '/od/buste_crowdedness/' + file_date + '_bc',header=True, mode='append')
 
