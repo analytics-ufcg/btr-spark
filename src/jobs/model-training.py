@@ -137,18 +137,18 @@ if __name__ == "__main__":
     # Crowdedness
     crowdedness_model = train_crowdedness_model(train.na.drop(subset=["crowdedness"]))
     # Pacing
-    pacing_model = train_pacing_model(train.na.drop(subset=["pacing"]))
+    #pacing_model = train_pacing_model(train.na.drop(subset=["pacing"]))
     # Speed
-    speed_model = train_speed_model(train.na.drop(subset=["speed"]))
+    #speed_model = train_speed_model(train.na.drop(subset=["speed"]))
 
     save_train_info(duration_model, test, "duration", train_info_path)
     save_train_info(crowdedness_model, test.na.drop(subset=["crowdedness"]), "crowdedness", train_info_path)
-    save_train_info(pacing_model, test, "pacing", train_info_path)
-    save_train_info(speed_model, test, "speed", train_info_path)
+    #save_train_info(pacing_model, test, "pacing", train_info_path)
+    #save_train_info(speed_model, test, "speed", train_info_path)
 
     save_model(duration_model, duration_model_path_to_save)
     save_model(crowdedness_model, crowdedness_model_path_to_save)
-    save_model(pacing_model, pacing_model_path_to_save)
-    save_model(speed_model, speed_model_path_to_save)
+    #save_model(pacing_model, pacing_model_path_to_save)
+    #save_model(speed_model, speed_model_path_to_save)
 
     sc.stop()
