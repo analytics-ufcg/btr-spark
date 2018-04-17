@@ -117,12 +117,12 @@ if __name__ == "__main__":
 
     training_data_path = sys.argv[1]
     output_folder_path = sys.argv[2]
-    duration_model_path_to_save = output_folder_path + "duration-model/"
-    crowdedness_model_path_to_save = output_folder_path + "crowdedness-model/"
-    pacing_model_path_to_save = output_folder_path + "pacing-model/"
-    speed_model_path_to_save = output_folder_path + "speed-model/"
-    pipeline_path = output_folder_path + "pipeline/"
-    train_info_path = output_folder_path + "train-info/"
+    duration_model_path_to_save = output_folder_path + os.sep + "duration-model/"
+    crowdedness_model_path_to_save = output_folder_path + os.sep + "crowdedness-model/"
+    pacing_model_path_to_save = output_folder_path + os.sep + "pacing-model/"
+    speed_model_path_to_save = output_folder_path + os.sep + "speed-model/"
+    pipeline_path = output_folder_path + os.sep + "pipeline/"
+    train_info_path = output_folder_path + os.sep + "train-info/"
 
     sc = SparkContext(appName="train_btr_2.0")
     sqlContext = pyspark.SQLContext(sc)
